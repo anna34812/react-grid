@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { DataGrid, DEFAULT_ROW_SELECTION } from "./grid/components/DataGrid";
+import { TreeDataGrid } from "./grid/components/TreeDataGrid";
 import { formatBytes } from "./grid/utils/treeData";
 import "./App.css";
 
@@ -81,7 +82,6 @@ function App() {
 
   const treeDataConfig = useMemo(
     () => ({
-      enabled: true,
       parentField: "parentId",
       rowIdField: "id",
       expandColumnField: "name",
@@ -109,9 +109,9 @@ function App() {
 
       <h2 style={{ marginTop: "2rem" }}>Tree data (file explorer)</h2>
       <p>
-        Flat rows with <code>parentId</code>; <code>treeData</code> enables expand/collapse, depth indent, and optional <code>aggregateValueField</code> for folder totals (passed as <code>treeAggregate</code> to <code>renderCell</code>).
+        <code>TreeDataGrid</code> uses a div-based <code>role=&quot;grid&quot;</code> body for tree rows. Flat data with <code>parentId</code>; <code>treeData</code> sets expand/collapse, indent, and optional <code>aggregateValueField</code> (as <code>treeAggregate</code> in <code>renderCell</code>).
       </p>
-      <DataGrid columns={treeColumns} treeData={treeDataConfig} enableColumnReorder rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} enableFiltering={enableFiltering} />
+      <TreeDataGrid columns={treeColumns} treeData={treeDataConfig} enableColumnReorder rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} enableFiltering={enableFiltering} />
 
       <p className='selection-summary'>
         Selected: {selection.selectedIds.length > 0 ? selection.selectedIds.join(", ") : "none"}

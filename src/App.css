@@ -31,18 +31,92 @@
   min-width: 0;
 }
 
-/* Tree rows: brief reveal when rows mount (expand / page change) */
-@keyframes data-grid-tree-row-enter {
-  from {
-    opacity: 0;
-  }
+/* TreeDataGrid: height opens (0fr → 1fr) and closes (1fr → 0fr), accordion-style */
+@keyframes tree-row-height-reveal {
   to {
-    opacity: 1;
+    grid-template-rows: 1fr;
   }
 }
 
-.data-grid-table tbody tr.data-grid-tree-row {
-  animation: data-grid-tree-row-enter 0.2s ease-out;
+@keyframes tree-row-height-close {
+  to {
+    grid-template-rows: 0fr;
+  }
+}
+
+.tree-data-grid {
+  display: flex;
+  flex-direction: column;
+  min-width: max-content;
+  width: 100%;
+}
+
+.tree-data-grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+.tree-data-grid-header-row,
+.tree-data-grid-row {
+  display: grid;
+  align-items: stretch;
+  border-bottom: 1px solid #e5e7eb;
+  min-width: 0;
+}
+
+.tree-row-height-anim {
+  display: grid;
+  min-width: 0;
+}
+
+.tree-row-height-anim:not(.tree-row-height-anim--animate):not(.tree-row-height-anim--animate-out) {
+  grid-template-rows: 1fr;
+}
+
+.tree-row-height-anim--animate {
+  --tree-stagger-step: 32ms;
+  grid-template-rows: 0fr;
+  animation: tree-row-height-reveal 0.42s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  animation-delay: calc(var(--tree-row-stagger, 0) * var(--tree-stagger-step, 32ms));
+}
+
+.tree-row-height-anim--animate-out {
+  --tree-stagger-step: 32ms;
+  grid-template-rows: 1fr;
+  animation: tree-row-height-close 0.42s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  animation-delay: calc(var(--tree-row-stagger, 0) * var(--tree-stagger-step, 32ms));
+}
+
+.tree-row-height-anim__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tree-grid-header-cell,
+.tree-grid-cell {
+  padding: 8px 10px;
+  min-height: 40px;
+  box-sizing: border-box;
+  border-right: 1px solid #f3f4f6;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.tree-grid-header-cell:last-child,
+.tree-grid-cell:last-child {
+  border-right: none;
+}
+
+.tree-grid-header-cell--select,
+.tree-grid-cell--select {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  padding: 0 8px;
+  justify-content: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -50,8 +124,14 @@
     transition: none;
   }
 
-  .data-grid-table tbody tr.data-grid-tree-row {
+  .tree-row-height-anim--animate {
     animation: none;
+    grid-template-rows: 1fr;
+  }
+
+  .tree-row-height-anim--animate-out {
+    animation: none;
+    grid-template-rows: 0fr;
   }
 }
 
