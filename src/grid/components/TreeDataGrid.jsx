@@ -6,7 +6,7 @@ import { patchRow } from "../api/gridApi";
 import { getColumnMinWidth, getEffectivePin } from "../utils/columnPinning";
 import { nextSortDirection } from "../utils/gridSort";
 import { buildGridTemplateColumns } from "../utils/gridTemplateColumns";
-import { computeTreeAggregates, flattenTreeRows, getIdsWithChildren } from "../utils/treeData";
+import { collectSubtreeIds, computeTreeAggregates, flattenTreeRows, getChildrenMap, getIdsWithChildren } from "../utils/treeData";
 import { useGridColumnOrder } from "../hooks/useGridColumnOrder";
 import { useGridEditFocus } from "../hooks/useGridEditFocus";
 import { useGridFilters } from "../hooks/useGridFilters";
@@ -25,6 +25,7 @@ const TREE_ROW_STAGGER_MS = 32;
 /**
  * Tree (hierarchical) data grid: div-based body for reliable row animations; same features as DataGrid tree mode (filters, sort, pin, column reorder, selection, aggregates, expand/collapse). No pagination — the flattened visible tree is shown in full (typical for tree UIs).
  * Pass flat rows with `parentId` (or `treeData.parentField`); roots use `null` parent.
+ * `treeData.groupSelection`: `'self'` (row only) or `'descendants'` (parent checkbox selects subtree). `treeData.showGroupSelectionControl` (default true): toolbar to switch modes.
  *
  * `animateRows`: each body row uses `0fr → 1fr` on mount (expand) and `1fr → 0fr` before removal (collapse). Set `false` for instant show/hide.
  */
@@ -66,6 +67,21 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   }, [rows, treeRowIdField, treeParentField]);
 
   const rowsById = useMemo(() => new Map(rows.map((r) => [r[treeRowIdField], r])), [rows, treeRowIdField]);
+
+  const childrenMap = useMemo(() => getChildrenMap(rows, { idField: treeRowIdField, parentField: treeParentField }), [rows, treeRowIdField, treeParentField]);
+
+  const [groupSelection, setGroupSelection] = useState(() => treeDataConfig.groupSelection ?? "self");
+  useEffect(() => {
+    if (treeDataConfig.groupSelection !== undefined) setGroupSelection(treeDataConfig.groupSelection);
+  }, [treeDataConfig.groupSelection]);
+
+  const treeOptions = useMemo(
+    () => ({
+      groupSelection,
+      childrenMap,
+    }),
+    [groupSelection, childrenMap],
+  );
 
   const isDescendantOf = useCallback(
     (row, ancestorId) => {
@@ -235,6 +251,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     rows,
     viewRowIds,
     rowIdField: treeRowIdField,
+    treeOptions,
   });
 
   const allSelectedVisible = allSelectedInView;
@@ -598,18 +615,33 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
             </div>
             <div className='tree-data-grid-body' role='rowgroup'>
               {flattenedRows.map((row, rowIndex) => {
-                const rowSelected = selectedSet.has(row.id);
+                const rid = row[treeRowIdField];
+                const subtreeIds =
+                  groupSelection === "descendants" && (childrenMap.get(rid)?.length ?? 0) > 0 ? collectSubtreeIds(rid, childrenMap) : [rid];
+                const selectedInSubtree = subtreeIds.filter((id) => selectedSet.has(id)).length;
+                const checkboxChecked = selectedInSubtree === subtreeIds.length;
+                const checkboxIndeterminate = selectedInSubtree > 0 && selectedInSubtree < subtreeIds.length;
+                const rowHighlight = groupSelection === "descendants" ? selectedInSubtree > 0 : selectedSet.has(rid);
                 const rowInner = (
                   <div
                     role='row'
-                    className={["tree-data-grid-row", rowSelected ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : ""].filter(Boolean).join(" ") || undefined}
+                    className={["tree-data-grid-row", rowHighlight ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : ""].filter(Boolean).join(" ") || undefined}
                     style={{ gridTemplateColumns: colTpl }}
-                    aria-selected={selectionEnabled ? rowSelected : undefined}
-                    onClick={(event) => handleRowBackgroundClick(event, row.id)}
+                    aria-selected={selectionEnabled ? rowHighlight : undefined}
+                    onClick={(event) => handleRowBackgroundClick(event, rid)}
                   >
                     {showLeadingSelect ? (
                       <div className='tree-grid-cell tree-grid-cell--select' role='gridcell' data-field='__select__' data-no-row-select>
-                        <input type='checkbox' checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
+                        <input
+                          type='checkbox'
+                          checked={checkboxChecked}
+                          ref={(el) => {
+                            if (el) el.indeterminate = checkboxIndeterminate;
+                          }}
+                          onChange={() => toggleRowSelection(rid)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select row ${String(rid)}`}
+                        />
                       </div>
                     ) : null}
                     {sectionColumns.map((column) => {
@@ -659,7 +691,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
                 return (
                   <div
-                    key={row.id}
+                    key={rid}
                     className={["tree-row-height-anim", animateRows && !isClosingRow && !suppressOpenAnim && "tree-row-height-anim--animate", animateRows && isClosingRow && "tree-row-height-anim--animate-out"].filter(Boolean).join(" ") || undefined}
                     {...(hasSplit ? { "data-sync-row-index": rowIndex } : {})}
                     style={{ "--tree-row-stagger": rowIndex }}
@@ -677,6 +709,17 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
   return (
     <div className='grid-container'>
+      {showSelectColumn && rs.mode === "multi" && treeDataConfig.showGroupSelectionControl !== false ? (
+        <div className='tree-grid-group-selection-toolbar'>
+          <label className='tree-grid-group-selection-label'>
+            Group selects:
+            <select aria-label='Group selection mode' value={groupSelection} onChange={(e) => setGroupSelection(e.target.value)}>
+              <option value='self'>self</option>
+              <option value='descendants'>descendants</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
       {error && <p className='status error'>{error}</p>}
       {editError && <p className='status error'>{editError}</p>}
       {!loading && !hasRows && <p className='status'>No rows found.</p>}

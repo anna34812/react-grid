@@ -87,6 +87,7 @@ function App() {
       expandColumnField: "name",
       aggregateValueField: "sizeBytes",
       indentPerLevel: 14,
+      groupSelection: "descendants", // self, descendants
     }),
     [],
   );

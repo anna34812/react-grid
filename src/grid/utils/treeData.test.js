@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { computeTreeAggregates, flattenTreeRows, formatBytes, getIdsWithChildren } from "./treeData.js";
+import {
+  collectSubtreeIds,
+  computeTreeAggregates,
+  flattenTreeRows,
+  formatBytes,
+  getChildrenMap,
+  getIdsWithChildren,
+} from "./treeData.js";
+
+describe("getChildrenMap / collectSubtreeIds", () => {
+  const rows = [
+    { id: 1, parentId: null },
+    { id: 2, parentId: 1 },
+    { id: 3, parentId: 1 },
+    { id: 4, parentId: 2 },
+  ];
+
+  it("builds ordered children lists", () => {
+    const m = getChildrenMap(rows, { idField: "id", parentField: "parentId" });
+    expect(m.get(1)).toEqual([2, 3]);
+    expect(m.get(2)).toEqual([4]);
+  });
+
+  it("collectSubtreeIds is pre-order", () => {
+    const m = getChildrenMap(rows, { idField: "id", parentField: "parentId" });
+    expect(collectSubtreeIds(1, m)).toEqual([1, 2, 4, 3]);
+    expect(collectSubtreeIds(2, m)).toEqual([2, 4]);
+  });
+});
 
 describe("getIdsWithChildren", () => {
   it("collects parent ids", () => {

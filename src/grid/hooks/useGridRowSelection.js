@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getColumnSections } from "../utils/columnPinning";
 import { mergeRowSelection, toIdSet } from "../utils/rowSelection";
+import { collectSubtreeIds } from "../utils/treeData";
 
-/** Row selection, pane placement for the checkbox column, and background-click selection. */
-export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectionChange, orderedColumns, pinnedOverrides, rows, viewRowIds, rowIdField = "id" }) {
+/**
+ * Row selection, pane placement for the checkbox column, and background-click selection.
+ * @param {{ groupSelection?: 'self' | 'descendants'; childrenMap?: Map<unknown, unknown[]> } | undefined} [treeOptions] Tree grid: when `groupSelection` is `descendants` and the row has children, toggling selects the whole subtree.
+ */
+export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectionChange, orderedColumns, pinnedOverrides, rows, viewRowIds, rowIdField = "id", treeOptions }) {
   const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
   const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
   const showSelectColumn = selectionEnabled && rs.checkboxes;
@@ -61,6 +65,23 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
     (rowId) => {
       if (!selectionEnabled) return;
 
+      if (
+        rs.mode === "multi" &&
+        treeOptions?.groupSelection === "descendants" &&
+        treeOptions.childrenMap
+      ) {
+        const childList = treeOptions.childrenMap.get(rowId);
+        if (childList && childList.length > 0) {
+          const subtreeIds = collectSubtreeIds(rowId, treeOptions.childrenMap);
+          const allSelected = subtreeIds.every((id) => selectedSet.has(id));
+          const next = new Set(selectedSet);
+          if (allSelected) subtreeIds.forEach((id) => next.delete(id));
+          else subtreeIds.forEach((id) => next.add(id));
+          applySelection(next);
+          return;
+        }
+      }
+
       const next = new Set(selectedSet);
       if (rs.mode === "single") {
         if (next.has(rowId)) next.clear();
@@ -72,7 +93,7 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
       else next.add(rowId);
       applySelection(next);
     },
-    [selectionEnabled, rs.mode, selectedSet, applySelection],
+    [selectionEnabled, rs.mode, selectedSet, applySelection, treeOptions],
   );
 
   const toggleSelectAllInView = useCallback(() => {

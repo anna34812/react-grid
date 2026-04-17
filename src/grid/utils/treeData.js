@@ -119,6 +119,50 @@ export function computeTreeAggregates(rows, options) {
   return memo;
 }
 
+/**
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {{ idField?: string; parentField?: string }} [options]
+ * @returns {Map<unknown, unknown[]>}
+ */
+export function getChildrenMap(rows, options = {}) {
+  const idField = options.idField ?? "id";
+  const parentField = options.parentField ?? "parentId";
+  /** @type {Map<unknown, unknown[]>} */
+  const children = new Map();
+  const orderIndex = new Map(rows.map((r, i) => [r[idField], i]));
+  for (const r of rows) {
+    const p = r[parentField];
+    if (p === undefined || p === null) continue;
+    if (!children.has(p)) children.set(p, []);
+    children.get(p).push(r[idField]);
+  }
+  for (const [pid, ids] of children) {
+    children.set(
+      pid,
+      [...ids].sort((a, b) => (orderIndex.get(a) ?? 0) - (orderIndex.get(b) ?? 0)),
+    );
+  }
+  return children;
+}
+
+/**
+ * Pre-order: root + all descendants (for descendant selection toggles).
+ * @param {unknown} rootId
+ * @param {Map<unknown, unknown[]>} childrenMap
+ * @returns {unknown[]}
+ */
+export function collectSubtreeIds(rootId, childrenMap) {
+  /** @type {unknown[]} */
+  const out = [];
+  const walk = (id) => {
+    out.push(id);
+    const kids = childrenMap.get(id) ?? [];
+    for (const kid of kids) walk(kid);
+  };
+  walk(rootId);
+  return out;
+}
+
 /** @param {number} bytes */
 export function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "";
