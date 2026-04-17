@@ -5,7 +5,7 @@ import { useInlineEdit } from "../hooks/useInlineEdit";
 import { patchRow } from "../api/gridApi";
 import { getColumnMinWidth, getEffectivePin, isColumnResizable } from "../utils/columnPinning";
 import { nextSortDirection } from "../utils/gridSort";
-import { buildGridTemplateColumns } from "../utils/gridTemplateColumns";
+import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
 import { reorderRowsById } from "../utils/rowOrder";
 import { useGridColumnOrder } from "../hooks/useGridColumnOrder";
 import { useGridEditFocus } from "../hooks/useGridEditFocus";
@@ -20,6 +20,7 @@ import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 
 /** Re-export for apps that imported `DEFAULT_ROW_SELECTION` from `DataGrid`. */
 export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
+export { COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
 
 /**
  * Column defs may set `resizable: false` to hide resize grip and double-click auto-fit for that column.
@@ -28,6 +29,10 @@ export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
  * - `server` — send `page` / `pageSize` to the API (default).
  * - `client` — fetch the full filtered/sorted result set and slice pages in the browser.
  * - `none` — no pagination UI; load and show all rows at once.
+ *
+ * Column sizing (`columnSizeMode`, Tabulator-style): `fitData` (fixed px), `fitDataStretchLast` (last column fills pane),
+ * `fitWidth` (all columns share remaining width with `minmax(px, 1fr)`). After layout, default column widths use the
+ * measured header width (label, filters, pin actions), not only `column.minWidth`, until the user resizes or auto-fits a column.
  */
 export const DataGrid = ({
   columns,
@@ -42,20 +47,29 @@ export const DataGrid = ({
   enableFiltering = true,
   enableColumnResize = true,
   paginationMode = "server",
+  columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA,
 }) => {
   const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
-  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize });
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount, { paginationMode });
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
   const [dragOverRowId, setDragOverRowId] = useState(null);
   const editedRowsRef = useRef(new Map());
   const [customSavingCell, setCustomSavingCell] = useState(null);
+  const gridMeasureRootRef = useRef(null);
 
   const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({
     columns,
     columnOrder: columnOrderProp,
     onColumnOrderChange,
     enableColumnReorder,
+  });
+
+  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({
+    enabled: enableColumnResize,
+    columns: orderedColumns,
+    columnSizeMode,
+    measureRootRef: gridMeasureRootRef,
+    enableFiltering,
   });
 
   const viewRowIds = useMemo(() => rows.map((r) => r.id), [rows]);
@@ -322,13 +336,24 @@ export const DataGrid = ({
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
-    const colTpl = buildGridTemplateColumns(sectionColumns, { showRowDrag: showLeadingRowDrag, showSelect: showLeadingSelect, columnWidths });
+    const colTpl = buildGridTemplateColumns(sectionColumns, {
+      showRowDrag: showLeadingRowDrag,
+      showSelect: showLeadingSelect,
+      columnWidths,
+      columnSizeMode,
+    });
     const ariaColCount = sectionColumns.length + (showLeadingSelect ? 1 : 0) + (showLeadingRowDrag ? 1 : 0);
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
         <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
-          <div className={["data-grid", resizingField ? "data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined} role='grid' aria-rowcount={rows.length} aria-colcount={ariaColCount}>
+          <div
+            className={["data-grid", resizingField ? "data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined}
+            data-column-size-mode={columnSizeMode}
+            role='grid'
+            aria-rowcount={rows.length}
+            aria-colcount={ariaColCount}
+          >
             <div className='data-grid-header' role='presentation'>
               <div className='data-grid-header-row' role='row' {...(hasSplit ? { "data-sync-header": "" } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingRowDrag ? (
@@ -544,7 +569,7 @@ export const DataGrid = ({
   };
 
   return (
-    <div className='grid-container'>
+    <div className='grid-container' ref={gridMeasureRootRef}>
       {error && <p className='status error'>{error}</p>}
       {editError && <p className='status error'>{editError}</p>}
       {!loading && !hasRows && <p className='status'>No rows found.</p>}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGridTemplateColumns } from "./gridTemplateColumns.js";
+import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from "./gridTemplateColumns.js";
 
 describe("buildGridTemplateColumns", () => {
   const cols = [
@@ -25,5 +25,25 @@ describe("buildGridTemplateColumns", () => {
   it("includes row drag and select tracks", () => {
     const t = buildGridTemplateColumns(cols, { showRowDrag: true, showSelect: true, columnWidths: {} });
     expect(t).toBe("36px 44px 100px 80px");
+  });
+
+  it("fitDataStretchLast uses minmax on the last data column only (center pane)", () => {
+    const t = buildGridTemplateColumns(cols, { columnSizeMode: COLUMN_SIZE_MODE.FIT_DATA_STRETCH_LAST, section: "center" });
+    expect(t).toBe("100px minmax(80px, 1fr)");
+  });
+
+  it("fitDataStretchLast on pinned pane uses px only", () => {
+    const t = buildGridTemplateColumns(cols, { columnSizeMode: COLUMN_SIZE_MODE.FIT_DATA_STRETCH_LAST, section: "left" });
+    expect(t).toBe("100px 80px");
+  });
+
+  it("fitWidth uses minmax for every data column in center pane", () => {
+    const t = buildGridTemplateColumns(cols, { columnSizeMode: COLUMN_SIZE_MODE.FIT_WIDTH, section: "center" });
+    expect(t).toBe("minmax(100px, 1fr) minmax(80px, 1fr)");
+  });
+
+  it("fitWidth on pinned pane uses px only", () => {
+    const t = buildGridTemplateColumns(cols, { columnSizeMode: COLUMN_SIZE_MODE.FIT_WIDTH, section: "left" });
+    expect(t).toBe("100px 80px");
   });
 });

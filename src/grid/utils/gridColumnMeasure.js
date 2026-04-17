@@ -203,6 +203,25 @@ function measureHeaderColumnWidth(headerEl) {
 }
 
 /**
+ * Widest width needed for the column header only (title, filter row, pin actions, resize grip).
+ * Use for initial "fit to data" sizing so tracks are not driven only by `minWidth` from column defs.
+ * @param {Element} rootEl container that includes header cells (e.g. `.grid-container`)
+ * @param {string} field column `field`
+ * @param {number} minW minimum width (px)
+ */
+export function measureColumnHeaderContentWidth(rootEl, field, minW) {
+  if (!rootEl || typeof field !== "string") return minW;
+  let max = minW;
+  const nodes = rootEl.querySelectorAll(`[data-field="${CSS.escape(field)}"]`);
+  for (const el of nodes) {
+    if (isColumnHeaderCell(el)) {
+      max = Math.max(max, measureHeaderColumnWidth(el));
+    }
+  }
+  return Math.min(GRID_COLUMN_AUTOFIT_MAX, Math.max(minW, Math.round(max)));
+}
+
+/**
  * Measure the widest `data-field` cell in the grid root for auto column sizing.
  * @param {Element} rootEl `.data-grid` or `.tree-data-grid`
  * @param {string} field column field id

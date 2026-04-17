@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { measureColumnContentWidth, measureHeaderTitleRowWidth, measureIntrinsicWidth } from "./gridColumnMeasure.js";
+import { measureColumnContentWidth, measureColumnHeaderContentWidth, measureHeaderTitleRowWidth, measureIntrinsicWidth } from "./gridColumnMeasure.js";
 
 describe("measureIntrinsicWidth", () => {
   it("restores inline styles after measure", () => {
@@ -29,6 +29,13 @@ describe("measureHeaderTitleRowWidth", () => {
     expect(w).toBe(220);
     expect(btn.style.flex).toMatch(/^1/);
     expect(btn.style.overflow).toBe("hidden");
+  });
+});
+
+describe("measureColumnHeaderContentWidth", () => {
+  it("returns minW when no matching header cells", () => {
+    const root = document.createElement("div");
+    expect(measureColumnHeaderContentWidth(root, "a", 100)).toBe(100);
   });
 });
 

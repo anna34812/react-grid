@@ -5,7 +5,7 @@ import { useInlineEdit } from "../hooks/useInlineEdit";
 import { patchRow } from "../api/gridApi";
 import { getColumnMinWidth, getEffectivePin, isColumnResizable } from "../utils/columnPinning";
 import { nextSortDirection } from "../utils/gridSort";
-import { buildGridTemplateColumns } from "../utils/gridTemplateColumns";
+import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
 import { collectSubtreeIds, computeTreeAggregates, flattenTreeRows, getChildrenMap, getIdsWithChildren } from "../utils/treeData";
 import { useGridColumnOrder } from "../hooks/useGridColumnOrder";
 import { useGridEditFocus } from "../hooks/useGridEditFocus";
@@ -19,6 +19,7 @@ import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 
 /** Re-export for convenience; same shape as DataGrid. */
 export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
+export { COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
 
 /** Must match `.tree-row-height-anim--animate` / `--animate-out` duration in App.css */
 const TREE_ROW_ANIM_MS = 420;
@@ -31,12 +32,25 @@ const TREE_ROW_STAGGER_MS = 32;
  *
  * `animateRows`: each body row uses `0fr → 1fr` on mount (expand) and `1fr → 0fr` before removal (collapse). Set `false` for instant show/hide.
  * Columns may set `resizable: false` to disable resize grip and double-click auto-fit for that column.
+ * `columnSizeMode`: same as DataGrid (`fitData`, `fitDataStretchLast`, `fitWidth`).
  */
-export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true, enableColumnResize = true }) => {
+export const TreeDataGrid = ({
+  columns,
+  treeData: treeDataConfig,
+  columnOrder: columnOrderProp,
+  onColumnOrderChange,
+  enableColumnReorder = false,
+  rowSelection: rowSelectionProp,
+  onSelectionChange,
+  onEditedRowsChange,
+  enableFiltering = true,
+  animateRows = true,
+  enableColumnResize = true,
+  columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA,
+}) => {
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
   const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
-  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize });
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: true } });
   const treeParentField = treeDataConfig.parentField ?? "parentId";
@@ -56,12 +70,21 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   const treeExpandInitRef = useRef(false);
   const editedRowsRef = useRef(new Map());
   const [customSavingCell, setCustomSavingCell] = useState(null);
+  const gridMeasureRootRef = useRef(null);
 
   const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({
     columns,
     columnOrder: columnOrderProp,
     onColumnOrderChange,
     enableColumnReorder,
+  });
+
+  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({
+    enabled: enableColumnResize,
+    columns: orderedColumns,
+    columnSizeMode,
+    measureRootRef: gridMeasureRootRef,
+    enableFiltering,
   });
 
   useEffect(() => {
@@ -473,12 +496,18 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     if (sectionColumns.length === 0) return null;
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
-    const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect, columnWidths });
+    const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect, columnWidths, columnSizeMode });
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
         <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
-          <div className={["tree-data-grid", resizingField ? "tree-data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined} role='grid' aria-rowcount={flattenedRows.length} aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}>
+          <div
+            className={["tree-data-grid", resizingField ? "tree-data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined}
+            data-column-size-mode={columnSizeMode}
+            role='grid'
+            aria-rowcount={flattenedRows.length}
+            aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}
+          >
             <div className='tree-data-grid-header' role='rowgroup'>
               <div className='tree-data-grid-header-row' role='row' {...(hasSplit ? { "data-tree-sync-header": "" } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingSelect ? (
@@ -718,7 +747,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   };
 
   return (
-    <div className='grid-container'>
+    <div className='grid-container' ref={gridMeasureRootRef}>
       {showSelectColumn && rs.mode === "multi" && treeDataConfig.showGroupSelectionControl !== false ? (
         <div className='tree-grid-group-selection-toolbar'>
           <label className='tree-grid-group-selection-label'>

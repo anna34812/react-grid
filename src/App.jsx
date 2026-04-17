@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { DataGrid, DEFAULT_ROW_SELECTION } from "./grid/components/DataGrid";
+import { DataGrid, DEFAULT_ROW_SELECTION, COLUMN_SIZE_MODE } from "./grid/components/DataGrid";
 import { TreeDataGrid } from "./grid/components/TreeDataGrid";
 import { formatBytes } from "./grid/utils/treeData";
 import "./App.css";
 
 function App() {
   const [enableFiltering, setEnableFiltering] = useState(true);
+  const [columnSizeMode, setColumnSizeMode] = useState(COLUMN_SIZE_MODE.FIT_DATA);
   const [selection, setSelection] = useState({ selectedIds: [], selectedRows: [] });
   const [editedState, setEditedState] = useState({ currentEditedRow: null, editedRows: [] });
 
@@ -104,10 +105,19 @@ function App() {
         <label>
           <input type='checkbox' checked={enableFiltering} onChange={(e) => setEnableFiltering(e.target.checked)} /> Show column filters
         </label>
+        <label>
+          Column size mode:{" "}
+          <select value={columnSizeMode} onChange={(e) => setColumnSizeMode(e.target.value)} aria-label='Column size mode'>
+            <option value={COLUMN_SIZE_MODE.FIT_DATA}>Fit to data</option>
+            <option value={COLUMN_SIZE_MODE.FIT_DATA_STRETCH_LAST}>Fit to data, stretch last column</option>
+            <option value={COLUMN_SIZE_MODE.FIT_WIDTH}>Fit to width</option>
+          </select>
+        </label>
       </p>
 
       <DataGrid
-        paginationMode='none' // default: server, client, none
+        columnSizeMode={columnSizeMode}
+        // paginationMode='none' // default: server, client, none
         columns={columns}
         enableColumnReorder
         enableRowDrag
