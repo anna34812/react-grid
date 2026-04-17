@@ -7,7 +7,6 @@ import { mergeColumnOrder, reorderFields } from "../utils/columnOrder";
 import { getColumnMinWidth, getColumnSections, getEffectivePin } from "../utils/columnPinning";
 import { computeTreeAggregates, flattenTreeRows, getIdsWithChildren } from "../utils/treeData";
 import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
-import { GridPagination } from "./GridPagination";
 import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 import { DEFAULT_ROW_SELECTION } from "./DataGrid";
 
@@ -37,16 +36,16 @@ const mergeRowSelection = (partial) => {
 };
 
 /**
- * Tree (hierarchical) data grid: div-based body for reliable row animations; same features as DataGrid tree mode (filters, sort, pin, column reorder, selection, pagination, aggregates, expand/collapse).
+ * Tree (hierarchical) data grid: div-based body for reliable row animations; same features as DataGrid tree mode (filters, sort, pin, column reorder, selection, aggregates, expand/collapse). No pagination — the flattened visible tree is shown in full (typical for tree UIs).
  * Pass flat rows with `parentId` (or `treeData.parentField`); roots use `null` parent.
  *
  * `animateRows`: each body row uses `0fr → 1fr` on mount (expand) and `1fr → 0fr` before removal (collapse). Set `false` for instant show/hide.
  */
 export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true }) => {
   const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
-  const gridQueryInitial = useMemo(() => ({ treeMode: true, pageSize: treeDataConfig.pageSize ?? 50 }), [treeDataConfig.pageSize]);
+  const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
-  const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
+  const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: true } });
   const [filterDraft, setFilterDraft] = useState({});
@@ -128,11 +127,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     return flat.map((r) => (r[treeRowIdField] === pendingCollapseId ? { ...r, __treeExpanded: false } : r));
   }, [rows, expandedRowIds, pendingCollapseId, treeRowIdField, treeParentField]);
 
-  const displayRows = useMemo(() => {
-    const start = (queryState.page - 1) * queryState.pageSize;
-    return flattenedRows.slice(start, start + queryState.pageSize);
-  }, [flattenedRows, queryState.page, queryState.pageSize]);
-
   useEffect(() => {
     const flatIds = new Set(flattenedRows.map((r) => r[treeRowIdField]));
     setOpenAnimSuppressedIds((prev) => {
@@ -145,11 +139,11 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   const closingMaxStaggerIndex = useMemo(() => {
     if (pendingCollapseId == null || !animateRows) return 0;
     let max = 0;
-    for (let i = 0; i < displayRows.length; i += 1) {
-      if (isDescendantOf(displayRows[i], pendingCollapseId)) max = Math.max(max, i);
+    for (let i = 0; i < flattenedRows.length; i += 1) {
+      if (isDescendantOf(flattenedRows[i], pendingCollapseId)) max = Math.max(max, i);
     }
     return max;
-  }, [pendingCollapseId, displayRows, isDescendantOf, animateRows]);
+  }, [pendingCollapseId, flattenedRows, isDescendantOf, animateRows]);
 
   const treeAggregateMap = useMemo(() => {
     if (!treeDataConfig.aggregateValueField) return null;
@@ -326,7 +320,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     return null;
   }, [leftColumns.length, centerColumns.length, rightColumns.length]);
 
-  const pageIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
+  const visibleRowIds = useMemo(() => flattenedRows.map((r) => r[treeRowIdField]), [flattenedRows, treeRowIdField]);
   const gridSplitRowRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -345,7 +339,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
         headerTrs.forEach((tr) => (tr.style.height = `${maxHeader}px`));
       }
 
-      for (let i = 0; i < displayRows.length; i += 1) {
+      for (let i = 0; i < flattenedRows.length; i += 1) {
         const trs = [...rootEl.querySelectorAll(`.tree-row-height-anim[data-sync-row-index="${i}"]`)];
         if (trs.length <= 1) continue;
         trs.forEach((tr) => (tr.style.height = ""));
@@ -370,10 +364,10 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
       cancelAnimationFrame(rafId);
       ro.disconnect();
     };
-  }, [hasSplit, displayRows]);
+  }, [hasSplit, flattenedRows]);
 
-  const allSelectedOnPage = pageIds.length > 0 && pageIds.every((id) => selectedSet.has(id));
-  const someSelectedOnPage = pageIds.some((id) => selectedSet.has(id)) && !allSelectedOnPage;
+  const allSelectedVisible = visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedSet.has(id));
+  const someSelectedVisible = visibleRowIds.some((id) => selectedSet.has(id)) && !allSelectedVisible;
 
   const applySelection = useCallback(
     (nextSet) => {
@@ -405,15 +399,15 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     [selectionEnabled, rs.mode, selectedSet, applySelection],
   );
 
-  const toggleSelectAllPage = useCallback(() => {
+  const toggleSelectAllVisible = useCallback(() => {
     if (rs.mode !== "multi" || !rs.checkboxes) return;
 
     const next = new Set(selectedSet);
-    if (allSelectedOnPage) pageIds.forEach((id) => next.delete(id));
-    else pageIds.forEach((id) => next.add(id));
+    if (allSelectedVisible) visibleRowIds.forEach((id) => next.delete(id));
+    else visibleRowIds.forEach((id) => next.add(id));
 
     applySelection(next);
-  }, [rs.mode, rs.checkboxes, pageIds, allSelectedOnPage, selectedSet, applySelection]);
+  }, [rs.mode, rs.checkboxes, visibleRowIds, allSelectedVisible, selectedSet, applySelection]);
 
   const applySelectionForRowClick = useCallback(
     (event, rowId) => {
@@ -538,9 +532,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     [filterPopoverField, columns, queryState.filters],
   );
 
-  const effectiveTotal = flattenedRows.length;
-  const pageFrom = effectiveTotal === 0 ? 0 : (queryState.page - 1) * queryState.pageSize + 1;
-  const pageTo = Math.min(queryState.page * queryState.pageSize, effectiveTotal);
   const hasRows = flattenedRows.length > 0;
 
   const handleSort = (field) => {
@@ -787,13 +778,13 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                   <div className='tree-grid-header-cell tree-grid-header-cell--select' role='columnheader' data-field='__select__'>
                     {enableFiltering ? (
                       <div className='header-stack'>
-                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all rows on this page' checked={allSelectedOnPage} ref={(el) => el && (el.indeterminate = someSelectedOnPage)} onChange={toggleSelectAllPage} /> : null}</div>
+                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
                         <div className='header-filter'>
                           <span className='header-filter-spacer' aria-hidden />
                         </div>
                       </div>
                     ) : (
-                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all rows on this page' checked={allSelectedOnPage} ref={(el) => el && (el.indeterminate = someSelectedOnPage)} onChange={toggleSelectAllPage} /> : null}</div>
+                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
                     )}
                   </div>
                 ) : null}
@@ -926,7 +917,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
               </div>
             </div>
             <div className='tree-data-grid-body' role='rowgroup'>
-              {displayRows.map((row, rowIndex) => {
+              {flattenedRows.map((row, rowIndex) => {
                 const rowSelected = selectedSet.has(row.id);
                 const rowInner = (
                   <div
@@ -1025,8 +1016,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
           {renderSectionGrid(rightColumns, "right")}
         </div>
       </div>
-
-      <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} hasRows={hasRows} onPageChange={setPage} onPageSizeChange={setPageSize} />
 
       {filterPopoverField ? (
         <ColumnFilterPopover

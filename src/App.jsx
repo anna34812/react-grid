@@ -86,7 +86,6 @@ function App() {
       rowIdField: "id",
       expandColumnField: "name",
       aggregateValueField: "sizeBytes",
-      pageSize: 50,
       indentPerLevel: 14,
     }),
     [],
