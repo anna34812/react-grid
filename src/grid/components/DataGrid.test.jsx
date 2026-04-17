@@ -219,6 +219,14 @@ describe("DataGrid", () => {
     expect(headerFields[1]).toBe("name");
   });
 
+  it("shows row reorder handles when enableRowDrag is true", async () => {
+    render(<DataGrid columns={columns} enableRowDrag />);
+    await screen.findByText("User 1");
+
+    const handles = screen.getAllByRole("button", { name: /^Reorder row / });
+    expect(handles.length).toBeGreaterThan(0);
+  });
+
   it("shows column move handles when enableColumnReorder is true", async () => {
     render(<DataGrid columns={columns} enableColumnReorder />);
     await screen.findByText("User 1");

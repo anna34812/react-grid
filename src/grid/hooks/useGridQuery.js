@@ -17,12 +17,7 @@ export const useGridQuery = (initialState = {}) => {
   }, []);
 
   const setSort = useCallback((sortField, sortDirection) => {
-    setQueryState((previous) => ({
-      ...previous,
-      sortField,
-      sortDirection,
-      page: 1,
-    }));
+    setQueryState((previous) => ({ ...previous, sortField, sortDirection, page: 1 }));
   }, []);
 
   const setFilter = useCallback((field, value, operator = "contains") => {
@@ -36,21 +31,17 @@ export const useGridQuery = (initialState = {}) => {
   }, []);
 
   const clearFilters = useCallback(() => {
-    setQueryState((previous) => ({ ...previous, filters: {}, page: 1 }));
+    setQueryState((previous) => {
+      const filters = previous.filters ?? {};
+      if (Object.keys(filters).length === 0) return previous;
+
+      return { ...previous, filters: {}, page: 1 };
+    });
   }, []);
 
   const setTotalCount = useCallback((totalCount) => {
     setQueryState((previous) => ({ ...previous, totalCount }));
   }, []);
 
-  return {
-    queryState,
-    totalPages,
-    setPage,
-    setPageSize,
-    setSort,
-    setFilter,
-    clearFilters,
-    setTotalCount,
-  };
+  return { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount };
 };

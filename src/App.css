@@ -166,6 +166,56 @@
   min-width: 44px;
 }
 
+.grid-row-drag-header,
+.grid-row-drag-cell {
+  background: #fafafa;
+  vertical-align: middle;
+  text-align: center;
+  width: 36px;
+  min-width: 36px;
+}
+
+.header-cell--row-drag {
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+
+.row-drag-header-icon {
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.row-drag-handle {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.row-drag-handle:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+.row-drag-handle:active {
+  cursor: grabbing;
+}
+
+.data-grid-row--drag-over {
+  outline: 2px dashed #6366f1;
+  outline-offset: -2px;
+}
+
 .data-grid-row--selected .grid-select-cell {
   background: #e0e7ff;
 }

@@ -4,29 +4,15 @@ import "./App.css";
 
 function App() {
   const [enableFiltering, setEnableFiltering] = useState(true);
-  const [selection, setSelection] = useState({
-    selectedIds: [],
-    selectedRows: [],
-  });
-  const [editedState, setEditedState] = useState({
-    currentEditedRow: null,
-    editedRows: [],
-  });
+  const [selection, setSelection] = useState({ selectedIds: [], selectedRows: [] });
+  const [editedState, setEditedState] = useState({ currentEditedRow: null, editedRows: [] });
 
-  const onSelectionChange = useCallback((detail) => {
-    setSelection({
-      selectedIds: detail.selectedIds,
-      selectedRows: detail.selectedRows,
-    });
-  }, []);
+  const onSelectionChange = useCallback((detail) => setSelection({ selectedIds: detail.selectedIds, selectedRows: detail.selectedRows }), []);
 
   const onEditedRowsChange = useCallback(({ currentEditedRow, editedRows }) => {
     console.log("onEditedRowsChange", currentEditedRow, editedRows);
 
-    setEditedState({
-      currentEditedRow: currentEditedRow,
-      editedRows: editedRows,
-    });
+    setEditedState({ currentEditedRow: currentEditedRow, editedRows: editedRows });
   }, []);
 
   const columns = useMemo(
@@ -85,7 +71,7 @@ function App() {
         </label>
       </p>
 
-      <DataGrid columns={columns} enableColumnReorder rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
+      <DataGrid columns={columns} enableColumnReorder enableRowDrag rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
 
       <p className='selection-summary'>
         Selected: {selection.selectedIds.length > 0 ? selection.selectedIds.join(", ") : "none"}

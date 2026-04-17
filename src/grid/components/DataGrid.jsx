@@ -5,6 +5,7 @@ import { useInlineEdit } from "../hooks/useInlineEdit";
 import { patchRow } from "../api/gridApi";
 import { mergeColumnOrder, reorderFields } from "../utils/columnOrder";
 import { getColumnMinWidth, getColumnSections, getEffectivePin } from "../utils/columnPinning";
+import { reorderRowsById } from "../utils/rowOrder";
 import { GridPagination } from "./GridPagination";
 
 const nextSortDirection = (currentField, currentDirection, field) => {
@@ -28,7 +29,7 @@ const mergeRowSelection = (partial) => {
   return rs;
 };
 
-export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true }) => {
+export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true }) => {
   const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
   const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
@@ -38,6 +39,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
   const isControlledColumnOrder = columnOrderProp !== undefined;
   const [internalColumnOrder, setInternalColumnOrder] = useState(() => mergeColumnOrder(undefined, columns));
   const [dragOverField, setDragOverField] = useState(null);
+  const [dragOverRowId, setDragOverRowId] = useState(null);
   const editableClickSelectionTimerRef = useRef(null);
   const editedRowsRef = useRef(new Map());
   const [customSavingCell, setCustomSavingCell] = useState(null);
@@ -105,6 +107,24 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     [enableColumnReorder],
   );
 
+  const handleRowDrop = useCallback(
+    (event, targetRowId) => {
+      if (!enableRowDrag) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setDragOverRowId(null);
+      const raw = event.dataTransfer.getData("application/x-data-grid-row-id");
+      if (!raw || raw === String(targetRowId)) return;
+
+      setRows((previous) => {
+        const next = reorderRowsById(previous, raw, targetRowId);
+        onRowOrderChange?.({ orderedIds: next.map((r) => r.id), rows: next });
+        return next;
+      });
+    },
+    [enableRowDrag, setRows, onRowOrderChange],
+  );
+
   const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
   const showSelectColumn = selectionEnabled && rs.checkboxes;
   const enableClickSelection = selectionEnabled && rs.enableClickSelection;
@@ -131,6 +151,14 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
     return null;
   }, [showSelectColumn, leftColumns.length, centerColumns.length, rightColumns.length]);
+
+  const leadingPane = useMemo(() => {
+    if (leftColumns.length > 0) return "left";
+    if (centerColumns.length > 0) return "center";
+    if (rightColumns.length > 0) return "right";
+
+    return null;
+  }, [leftColumns.length, centerColumns.length, rightColumns.length]);
 
   const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const gridSplitRowRef = useRef(null);
@@ -462,6 +490,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     if (sectionColumns.length === 0) return null;
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
+    const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
@@ -469,6 +498,15 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
           <table className='data-grid-table'>
             <thead>
               <tr {...(hasSplit ? { "data-sync-header": "" } : {})}>
+                {showLeadingRowDrag ? (
+                  <th className='grid-row-drag-header' scope='col' aria-label='Reorder rows' style={{ width: 36, minWidth: 36 }} data-field='__rowDrag__'>
+                    <div className='header-stack'>
+                      <div className='header-filter'>
+                        <span className='header-filter-spacer' aria-hidden />
+                      </div>
+                    </div>
+                  </th>
+                ) : null}
                 {showLeadingSelect ? (
                   <th className='grid-select-header' style={{ width: 44, minWidth: 44 }} data-field='__select__'>
                     {enableFiltering ? (
@@ -576,15 +614,50 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
             <tbody>
               {rows.map((row, rowIndex) => {
                 const rowSelected = selectedSet.has(row.id);
+                const rowDragOver = enableRowDrag && dragOverRowId === row.id;
                 return (
                   <tr
                     key={row.id}
                     role='row'
                     {...(hasSplit ? { "data-sync-row-index": rowIndex } : {})}
-                    className={[rowSelected ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : ""].filter(Boolean).join(" ") || undefined}
+                    className={[rowSelected ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : "", rowDragOver ? "data-grid-row--drag-over" : ""].filter(Boolean).join(" ") || undefined}
                     aria-selected={selectionEnabled ? rowSelected : undefined}
                     onClick={(event) => handleRowBackgroundClick(event, row.id)}
+                    onDragOverCapture={
+                      enableRowDrag
+                        ? (e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            setDragOverRowId(row.id);
+                          }
+                        : undefined
+                    }
+                    onDragLeave={
+                      enableRowDrag
+                        ? (e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget)) setDragOverRowId(null);
+                          }
+                        : undefined
+                    }
+                    onDropCapture={enableRowDrag ? (e) => handleRowDrop(e, row.id) : undefined}
                   >
+                    {showLeadingRowDrag ? (
+                      <td className='grid-row-drag-cell' data-field='__rowDrag__' data-no-row-select>
+                        <button
+                          type='button'
+                          className='row-drag-handle'
+                          draggable
+                          aria-label={`Reorder row ${row.id}`}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("application/x-data-grid-row-id", String(row.id));
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => setDragOverRowId(null)}
+                        >
+                          ⠿
+                        </button>
+                      </td>
+                    ) : null}
                     {showLeadingSelect ? (
                       <td className='grid-select-cell' data-field='__select__' data-no-row-select>
                         <input type='checkbox' checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
