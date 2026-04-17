@@ -4,37 +4,31 @@ export const DEFAULT_QUERY_STATE = {
   sortField: null,
   sortDirection: null,
   filters: {},
-}
+};
 
-export function serializeFilters(filters) {
-  return JSON.stringify(filters ?? {})
-}
+export const serializeFilters = (filters) => JSON.stringify(filters ?? {});
 
-export function buildQueryParams(queryState) {
-  const params = new URLSearchParams()
-  params.set('page', String(queryState.page))
-  params.set('pageSize', String(queryState.pageSize))
+export const buildQueryParams = (queryState) => {
+  const params = new URLSearchParams();
+  params.set("page", String(queryState.page));
+  params.set("pageSize", String(queryState.pageSize));
 
   if (queryState.sortField && queryState.sortDirection) {
-    params.set('sortField', queryState.sortField)
-    params.set('sortDirection', queryState.sortDirection)
+    params.set("sortField", queryState.sortField);
+    params.set("sortDirection", queryState.sortDirection);
   }
 
-  if (queryState.filters && Object.keys(queryState.filters).length > 0) {
-    params.set('filters', serializeFilters(queryState.filters))
-  }
+  if (queryState.filters && Object.keys(queryState.filters).length > 0) params.set("filters", serializeFilters(queryState.filters));
 
-  return params
-}
+  return params;
+};
 
-export function parseFilters(rawFilters) {
-  if (!rawFilters) {
-    return {}
-  }
+export const parseFilters = (rawFilters) => {
+  if (!rawFilters) return {};
 
   try {
-    return JSON.parse(rawFilters)
+    return JSON.parse(rawFilters);
   } catch {
-    return {}
+    return {};
   }
-}
+};

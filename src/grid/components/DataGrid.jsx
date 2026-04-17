@@ -1,52 +1,26 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
 import { patchRow } from "../api/gridApi";
-import {
-  getColumnMinWidth,
-  getColumnSections,
-  getEffectivePin,
-} from "../utils/columnPinning";
+import { getColumnMinWidth, getColumnSections, getEffectivePin } from "../utils/columnPinning";
 
 function nextSortDirection(currentField, currentDirection, field) {
-  if (currentField !== field) {
-    return "asc";
-  }
-
-  if (currentDirection === "asc") {
-    return "desc";
-  }
-
-  if (currentDirection === "desc") {
-    return null;
-  }
+  if (currentField !== field) return "asc";
+  if (currentDirection === "asc") return "desc";
+  if (currentDirection === "desc") return null;
 
   return "asc";
 }
 
 function toIdSet(ids) {
-  if (ids == null) {
-    return new Set();
-  }
+  if (ids == null) return new Set();
+
   return new Set(Array.isArray(ids) ? ids : [...ids]);
 }
 
 /** Merged with `rowSelection` from props; spread this in the app for partial overrides. */
-export const DEFAULT_ROW_SELECTION = {
-  mode: "none",
-  checkboxes: true,
-  enableClickSelection: false,
-  selectedIds: undefined,
-  defaultSelectedIds: undefined,
-};
+export const DEFAULT_ROW_SELECTION = { mode: "none", checkboxes: true, enableClickSelection: false, selectedIds: undefined, defaultSelectedIds: undefined };
 
 function mergeRowSelection(partial) {
   const rs = { ...DEFAULT_ROW_SELECTION, ...(partial ?? {}) };
@@ -56,41 +30,11 @@ function mergeRowSelection(partial) {
   return rs;
 }
 
-export function DataGrid({
-  columns,
-  rowSelection: rowSelectionProp,
-  onSelectionChange,
-  onEditedRowsChange,
-  enableFiltering = true,
-}) {
-  const rs = useMemo(
-    () => mergeRowSelection(rowSelectionProp),
-    [rowSelectionProp],
-  );
-  const {
-    queryState,
-    totalPages,
-    setPage,
-    setPageSize,
-    setSort,
-    setFilter,
-    clearFilters,
-    setTotalCount,
-  } = useGridQuery();
-  const { rows, loading, error, setRows } = useGridData(
-    queryState,
-    setTotalCount,
-  );
-  const {
-    editingCell,
-    draftValue,
-    savingCell,
-    editError,
-    setDraftValue,
-    startEdit,
-    cancelEdit,
-    saveEdit,
-  } = useInlineEdit(setRows);
+export function DataGrid({ columns, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true }) {
+  const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
+  const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
+  const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
+  const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
   const [filterDraft, setFilterDraft] = useState({});
   const [pinnedOverrides, setPinnedOverrides] = useState({});
   const editableClickSelectionTimerRef = useRef(null);
@@ -105,9 +49,7 @@ export function DataGrid({
     if (!host) {
       return;
     }
-    const focusable = host.querySelector(
-      "input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [contenteditable='true'], [tabindex]:not([tabindex='-1'])",
-    );
+    const focusable = host.querySelector("input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [contenteditable='true'], [tabindex]:not([tabindex='-1'])");
     if (focusable instanceof HTMLElement) {
       focusable.focus({ preventScroll: true });
       if (focusable instanceof HTMLInputElement) {
@@ -121,18 +63,9 @@ export function DataGrid({
   const enableClickSelection = selectionEnabled && rs.enableClickSelection;
   const isControlled = rs.selectedIds !== undefined;
 
-  const [internalSelected, setInternalSelected] = useState(() =>
-    toIdSet(mergeRowSelection(rowSelectionProp).defaultSelectedIds),
-  );
+  const [internalSelected, setInternalSelected] = useState(() => toIdSet(mergeRowSelection(rowSelectionProp).defaultSelectedIds));
 
-  const {
-    left: leftColumns,
-    center: centerColumns,
-    right: rightColumns,
-  } = useMemo(
-    () => getColumnSections(columns, pinnedOverrides),
-    [columns, pinnedOverrides],
-  );
+  const { left: leftColumns, center: centerColumns, right: rightColumns } = useMemo(() => getColumnSections(columns, pinnedOverrides), [columns, pinnedOverrides]);
 
   const hasSplit = leftColumns.length > 0 || rightColumns.length > 0;
 
@@ -160,18 +93,11 @@ export function DataGrid({
       return "right";
     }
     return null;
-  }, [
-    showSelectColumn,
-    leftColumns.length,
-    centerColumns.length,
-    rightColumns.length,
-  ]);
+  }, [showSelectColumn, leftColumns.length, centerColumns.length, rightColumns.length]);
 
   const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
-  const allSelectedOnPage =
-    pageIds.length > 0 && pageIds.every((id) => selectedSet.has(id));
-  const someSelectedOnPage =
-    pageIds.some((id) => selectedSet.has(id)) && !allSelectedOnPage;
+  const allSelectedOnPage = pageIds.length > 0 && pageIds.every((id) => selectedSet.has(id));
+  const someSelectedOnPage = pageIds.some((id) => selectedSet.has(id)) && !allSelectedOnPage;
 
   const applySelection = useCallback(
     (nextSet) => {
@@ -222,14 +148,7 @@ export function DataGrid({
       pageIds.forEach((id) => next.add(id));
     }
     applySelection(next);
-  }, [
-    rs.mode,
-    rs.checkboxes,
-    pageIds,
-    allSelectedOnPage,
-    selectedSet,
-    applySelection,
-  ]);
+  }, [rs.mode, rs.checkboxes, pageIds, allSelectedOnPage, selectedSet, applySelection]);
 
   const applySelectionForRowClick = useCallback(
     (event, rowId) => {
@@ -237,8 +156,7 @@ export function DataGrid({
         return;
       }
 
-      const multiClickWithoutCheckbox =
-        rs.mode === "multi" && !rs.checkboxes && enableClickSelection;
+      const multiClickWithoutCheckbox = rs.mode === "multi" && !rs.checkboxes && enableClickSelection;
 
       if (multiClickWithoutCheckbox) {
         const additive = event.ctrlKey || event.metaKey;
@@ -259,14 +177,7 @@ export function DataGrid({
 
       toggleRowSelection(rowId);
     },
-    [
-      enableClickSelection,
-      rs.mode,
-      rs.checkboxes,
-      selectedSet,
-      applySelection,
-      toggleRowSelection,
-    ],
+    [enableClickSelection, rs.mode, rs.checkboxes, selectedSet, applySelection, toggleRowSelection],
   );
 
   const handleRowBackgroundClick = useCallback(
@@ -334,20 +245,13 @@ export function DataGrid({
   }, [enableFiltering, filterDraft, setFilter]);
 
   const pageFrom = (queryState.page - 1) * queryState.pageSize + 1;
-  const pageTo = Math.min(
-    queryState.page * queryState.pageSize,
-    queryState.totalCount || 0,
-  );
+  const pageTo = Math.min(queryState.page * queryState.pageSize, queryState.totalCount || 0);
   const hasRows = rows.length > 0;
 
   const pageSizeOptions = useMemo(() => [10, 20, 50, 100], []);
 
   const handleSort = (field) => {
-    const direction = nextSortDirection(
-      queryState.sortField,
-      queryState.sortDirection,
-      field,
-    );
+    const direction = nextSortDirection(queryState.sortField, queryState.sortDirection, field);
 
     if (!direction) {
       setSort(null, null);
@@ -373,8 +277,7 @@ export function DataGrid({
   const handleSaveEdit = useCallback(
     async ({ row, column }) => {
       const previousRow = row;
-      const nextValue =
-        column.type === "number" ? Number(draftValue) : draftValue;
+      const nextValue = column.type === "number" ? Number(draftValue) : draftValue;
       const didSave = await saveEdit({
         rowId: row.id,
         field: column.field,
@@ -395,8 +298,7 @@ export function DataGrid({
 
   const updateCustomCellValue = useCallback(
     async ({ row, column, nextValue }) => {
-      const normalizedValue =
-        column.type === "number" ? Number(nextValue) : nextValue;
+      const normalizedValue = column.type === "number" ? Number(nextValue) : nextValue;
       if (Object.is(row[column.field], normalizedValue)) {
         return true;
       }
@@ -404,11 +306,7 @@ export function DataGrid({
       setCustomSavingCell({ rowId: row.id, field: column.field });
       setRows((rowsSnapshot) => {
         previousRows.push(...rowsSnapshot);
-        return rowsSnapshot.map((currentRow) =>
-          currentRow.id === row.id
-            ? { ...currentRow, [column.field]: normalizedValue }
-            : currentRow,
-        );
+        return rowsSnapshot.map((currentRow) => (currentRow.id === row.id ? { ...currentRow, [column.field]: normalizedValue } : currentRow));
       });
 
       try {
@@ -431,12 +329,8 @@ export function DataGrid({
   );
 
   const renderCell = (row, column) => {
-    const isEditing =
-      editingCell?.rowId === row.id && editingCell?.field === column.field;
-    const isSaving =
-      (savingCell?.rowId === row.id && savingCell?.field === column.field) ||
-      (customSavingCell?.rowId === row.id &&
-        customSavingCell?.field === column.field);
+    const isEditing = editingCell?.rowId === row.id && editingCell?.field === column.field;
+    const isSaving = (savingCell?.rowId === row.id && savingCell?.field === column.field) || (customSavingCell?.rowId === row.id && customSavingCell?.field === column.field);
     const baseRenderParams = {
       row,
       column,
@@ -453,8 +347,7 @@ export function DataGrid({
         if (isSaving) {
           return false;
         }
-        const previousValue =
-          row[column.field] == null ? "" : String(row[column.field]);
+        const previousValue = row[column.field] == null ? "" : String(row[column.field]);
         if (draftValue === previousValue) {
           cancelEdit();
           return true;
@@ -488,16 +381,7 @@ export function DataGrid({
 
       if (typeof column.renderEditCell === "function") {
         return (
-          <div
-            className="edit-cell"
-            data-no-row-select
-            data-edit-host
-            onPointerDown={stopEditHostBubble}
-            onPointerUp={stopEditHostBubble}
-            onClick={stopEditHostBubble}
-            onBlur={handleEditHostBlur}
-            onKeyDown={handleEditHostKeyDown}
-          >
+          <div className='edit-cell' data-no-row-select data-edit-host onPointerDown={stopEditHostBubble} onPointerUp={stopEditHostBubble} onClick={stopEditHostBubble} onBlur={handleEditHostBlur} onKeyDown={handleEditHostKeyDown}>
             {column.renderEditCell({
               ...baseRenderParams,
               value: draftValue,
@@ -510,16 +394,7 @@ export function DataGrid({
       }
 
       return (
-        <div
-          className="edit-cell"
-          data-no-row-select
-          data-edit-host
-          onPointerDown={stopEditHostBubble}
-          onPointerUp={stopEditHostBubble}
-          onClick={stopEditHostBubble}
-          onBlur={handleEditHostBlur}
-          onKeyDown={handleEditHostKeyDown}
-        >
+        <div className='edit-cell' data-no-row-select data-edit-host onPointerDown={stopEditHostBubble} onPointerUp={stopEditHostBubble} onClick={stopEditHostBubble} onBlur={handleEditHostBlur} onKeyDown={handleEditHostKeyDown}>
           <input
             value={draftValue}
             disabled={isSaving}
@@ -561,22 +436,21 @@ export function DataGrid({
       return column.renderCell({
         ...baseRenderParams,
         startEdit: () => startEdit(row.id, column.field, row[column.field]),
-        updateValue: (nextValue) =>
-          updateCustomCellValue({ row, column, nextValue }),
+        updateValue: (nextValue) => updateCustomCellValue({ row, column, nextValue }),
       });
     }
 
     if (!column.editable) {
-      return <span className="cell-display">{String(row[column.field])}</span>;
+      return <span className='cell-display'>{String(row[column.field])}</span>;
     }
 
     const editableCellKey = `${row.id}:${column.field}`;
 
     return (
       <span
-        role="button"
+        role='button'
         tabIndex={isSaving ? -1 : 0}
-        className="cell-button cell-button--editable"
+        className='cell-button cell-button--editable'
         data-editable-cell={editableCellKey}
         aria-disabled={isSaving}
         onClick={(e) => {
@@ -591,10 +465,7 @@ export function DataGrid({
             clearTimeout(editableClickSelectionTimerRef.current);
           }
           editableClickSelectionTimerRef.current = setTimeout(() => {
-            applySelectionForRowClick(
-              { ctrlKey: e.ctrlKey, metaKey: e.metaKey },
-              row.id,
-            );
+            applySelectionForRowClick({ ctrlKey: e.ctrlKey, metaKey: e.metaKey }, row.id);
             editableClickSelectionTimerRef.current = null;
           }, 180);
         }}
@@ -638,30 +509,19 @@ export function DataGrid({
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
-        <div
-          className={
-            hasSplit
-              ? "grid-pane-scroll grid-pane-scroll--pinned"
-              : "grid-pane-scroll"
-          }
-          data-hscroll={hasSplit ? "always" : "auto"}
-        >
-          <table className="data-grid-table">
+        <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
+          <table className='data-grid-table'>
             <thead>
               <tr>
                 {showLeadingSelect ? (
-                  <th
-                    className="grid-select-header"
-                    style={{ width: 44, minWidth: 44 }}
-                    data-field="__select__"
-                  >
+                  <th className='grid-select-header' style={{ width: 44, minWidth: 44 }} data-field='__select__'>
                     {enableFiltering ? (
-                      <div className="header-stack">
-                        <div className="header-cell header-cell--select">
+                      <div className='header-stack'>
+                        <div className='header-cell header-cell--select'>
                           {rs.mode === "multi" ? (
                             <input
-                              type="checkbox"
-                              aria-label="Select all rows on this page"
+                              type='checkbox'
+                              aria-label='Select all rows on this page'
                               checked={allSelectedOnPage}
                               ref={(el) => {
                                 if (el) {
@@ -672,16 +532,16 @@ export function DataGrid({
                             />
                           ) : null}
                         </div>
-                        <div className="header-filter">
-                          <span className="header-filter-spacer" aria-hidden />
+                        <div className='header-filter'>
+                          <span className='header-filter-spacer' aria-hidden />
                         </div>
                       </div>
                     ) : (
-                      <div className="header-cell header-cell--select">
+                      <div className='header-cell header-cell--select'>
                         {rs.mode === "multi" ? (
                           <input
-                            type="checkbox"
-                            aria-label="Select all rows on this page"
+                            type='checkbox'
+                            aria-label='Select all rows on this page'
                             checked={allSelectedOnPage}
                             ref={(el) => {
                               if (el) {
@@ -700,18 +560,13 @@ export function DataGrid({
                   const direction = isSorted ? queryState.sortDirection : null;
                   const pin = getEffectivePin(column, pinnedOverrides);
                   return (
-                    <th
-                      key={column.field}
-                      style={columnStyle(column)}
-                      data-field={column.field}
-                      data-pinned={pin ?? undefined}
-                    >
+                    <th key={column.field} style={columnStyle(column)} data-field={column.field} data-pinned={pin ?? undefined}>
                       {enableFiltering ? (
-                        <div className="header-stack">
-                          <div className="header-cell">
+                        <div className='header-stack'>
+                          <div className='header-cell'>
                             <button
-                              type="button"
-                              className="header-button"
+                              type='button'
+                              className='header-button'
                               onClick={() => {
                                 handleSort(column.field);
                               }}
@@ -720,45 +575,35 @@ export function DataGrid({
                               {direction === "asc" && " \u2191"}
                               {direction === "desc" && " \u2193"}
                             </button>
-                            <div
-                              className="pin-actions"
-                              role="group"
-                              aria-label={`${column.label} pinning`}
-                            >
+                            <div className='pin-actions' role='group' aria-label={`${column.label} pinning`}>
                               <button
-                                type="button"
+                                type='button'
                                 className={`pin-button${pin === "left" ? " active" : ""}`}
                                 aria-pressed={pin === "left"}
                                 aria-label={`Pin ${column.label} left`}
                                 onClick={() => {
-                                  setPinForField(
-                                    column.field,
-                                    pin === "left" ? null : "left",
-                                  );
+                                  setPinForField(column.field, pin === "left" ? null : "left");
                                 }}
                               >
                                 L
                               </button>
                               <button
-                                type="button"
+                                type='button'
                                 className={`pin-button${pin === "right" ? " active" : ""}`}
                                 aria-pressed={pin === "right"}
                                 aria-label={`Pin ${column.label} right`}
                                 onClick={() => {
-                                  setPinForField(
-                                    column.field,
-                                    pin === "right" ? null : "right",
-                                  );
+                                  setPinForField(column.field, pin === "right" ? null : "right");
                                 }}
                               >
                                 R
                               </button>
                             </div>
                           </div>
-                          <div className="header-filter">
+                          <div className='header-filter'>
                             {column.filterable ? (
                               <input
-                                className="header-filter-input"
+                                className='header-filter-input'
                                 placeholder={`Filter ${column.label}`}
                                 value={filterDraft[column.field]?.value ?? ""}
                                 onChange={(event) => {
@@ -767,25 +612,21 @@ export function DataGrid({
                                     ...previous,
                                     [column.field]: {
                                       value,
-                                      operator:
-                                        column.filterOperator || "contains",
+                                      operator: column.filterOperator || "contains",
                                     },
                                   }));
                                 }}
                               />
                             ) : (
-                              <span
-                                className="header-filter-spacer"
-                                aria-hidden
-                              />
+                              <span className='header-filter-spacer' aria-hidden />
                             )}
                           </div>
                         </div>
                       ) : (
-                        <div className="header-cell">
+                        <div className='header-cell'>
                           <button
-                            type="button"
-                            className="header-button"
+                            type='button'
+                            className='header-button'
                             onClick={() => {
                               handleSort(column.field);
                             }}
@@ -794,35 +635,25 @@ export function DataGrid({
                             {direction === "asc" && " \u2191"}
                             {direction === "desc" && " \u2193"}
                           </button>
-                          <div
-                            className="pin-actions"
-                            role="group"
-                            aria-label={`${column.label} pinning`}
-                          >
+                          <div className='pin-actions' role='group' aria-label={`${column.label} pinning`}>
                             <button
-                              type="button"
+                              type='button'
                               className={`pin-button${pin === "left" ? " active" : ""}`}
                               aria-pressed={pin === "left"}
                               aria-label={`Pin ${column.label} left`}
                               onClick={() => {
-                                setPinForField(
-                                  column.field,
-                                  pin === "left" ? null : "left",
-                                );
+                                setPinForField(column.field, pin === "left" ? null : "left");
                               }}
                             >
                               L
                             </button>
                             <button
-                              type="button"
+                              type='button'
                               className={`pin-button${pin === "right" ? " active" : ""}`}
                               aria-pressed={pin === "right"}
                               aria-label={`Pin ${column.label} right`}
                               onClick={() => {
-                                setPinForField(
-                                  column.field,
-                                  pin === "right" ? null : "right",
-                                );
+                                setPinForField(column.field, pin === "right" ? null : "right");
                               }}
                             >
                               R
@@ -839,44 +670,14 @@ export function DataGrid({
               {rows.map((row) => {
                 const rowSelected = selectedSet.has(row.id);
                 return (
-                  <tr
-                    key={row.id}
-                    role="row"
-                    className={
-                      [
-                        rowSelected ? "data-grid-row--selected" : "",
-                        enableClickSelection ? "data-grid-row--clickable" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ") || undefined
-                    }
-                    aria-selected={selectionEnabled ? rowSelected : undefined}
-                    onClick={(event) => handleRowBackgroundClick(event, row.id)}
-                  >
+                  <tr key={row.id} role='row' className={[rowSelected ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : ""].filter(Boolean).join(" ") || undefined} aria-selected={selectionEnabled ? rowSelected : undefined} onClick={(event) => handleRowBackgroundClick(event, row.id)}>
                     {showLeadingSelect ? (
-                      <td
-                        className="grid-select-cell"
-                        data-field="__select__"
-                        data-no-row-select
-                      >
-                        <input
-                          type="checkbox"
-                          checked={rowSelected}
-                          onChange={() => toggleRowSelection(row.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select row ${row.id}`}
-                        />
+                      <td className='grid-select-cell' data-field='__select__' data-no-row-select>
+                        <input type='checkbox' checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
                       </td>
                     ) : null}
                     {sectionColumns.map((column) => (
-                      <td
-                        key={`${row.id}-${column.field}`}
-                        style={columnStyle(column)}
-                        data-field={column.field}
-                        data-pinned={
-                          getEffectivePin(column, pinnedOverrides) ?? undefined
-                        }
-                      >
+                      <td key={`${row.id}-${column.field}`} style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
                         {renderCell(row, column)}
                       </td>
                     ))}
@@ -891,35 +692,29 @@ export function DataGrid({
   };
 
   return (
-    <div className="grid-container">
-      {error && <p className="status error">{error}</p>}
-      {editError && <p className="status error">{editError}</p>}
-      {!loading && !hasRows && <p className="status">No rows found.</p>}
+    <div className='grid-container'>
+      {error && <p className='status error'>{error}</p>}
+      {editError && <p className='status error'>{editError}</p>}
+      {!loading && !hasRows && <p className='status'>No rows found.</p>}
 
-      <div
-        className={`grid-split-root${hasSplit ? " grid-split-root--split" : ""}`}
-      >
+      <div className={`grid-split-root${hasSplit ? " grid-split-root--split" : ""}`}>
         {loading ? (
-          <div
-            className="grid-loading-overlay"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="grid-loading-chip">
-              <span className="grid-loading-spinner" aria-hidden />
+          <div className='grid-loading-overlay' role='status' aria-live='polite'>
+            <div className='grid-loading-chip'>
+              <span className='grid-loading-spinner' aria-hidden />
               <span>Loading...</span>
             </div>
           </div>
         ) : null}
-        <div className="grid-split-row">
+        <div className='grid-split-row'>
           {renderSectionTable(leftColumns, "left")}
           {renderSectionTable(centerColumns, "center")}
           {renderSectionTable(rightColumns, "right")}
         </div>
       </div>
 
-      <div className="pagination">
-        <div className="grid-toolbar">
+      <div className='pagination'>
+        <div className='grid-toolbar'>
           <label>
             Page size
             <select
@@ -956,8 +751,7 @@ export function DataGrid({
           Next
         </button>
         <span>
-          Showing {hasRows ? pageFrom : 0}-{hasRows ? pageTo : 0} of{" "}
-          {queryState.totalCount || 0}
+          Showing {hasRows ? pageFrom : 0}-{hasRows ? pageTo : 0} of {queryState.totalCount || 0}
         </span>
       </div>
     </div>
