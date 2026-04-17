@@ -17,7 +17,7 @@ describe("DataGrid", () => {
     render(<DataGrid columns={columns} />);
     expect(await screen.findByText("User 1")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(await screen.findByText("User 21")).toBeInTheDocument();
   });
 

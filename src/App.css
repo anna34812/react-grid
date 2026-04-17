@@ -711,9 +711,98 @@
 
 .pagination {
   margin-top: 12px;
+  margin-left: -12px;
+  margin-right: -12px;
+  padding: 12px 12px 0;
+  border-top: 1px solid #e5e7eb;
   display: flex;
-  gap: 12px;
+  justify-content: flex-end;
   align-items: center;
+  font-size: 13px;
+  color: #374151;
+}
+
+.pagination__inner {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pagination__group--nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pagination__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.pagination__select {
+  padding: 4px 28px 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: #111827;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.pagination__range,
+.pagination__page-status {
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination__range strong,
+.pagination__page-status strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.pagination__page-status {
+  padding: 0 6px;
+  min-width: 6.5rem;
+  text-align: center;
+}
+
+.pagination__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.pagination__icon-btn:disabled {
+  color: #d1d5db;
+  cursor: default;
+}
+
+.pagination__icon-btn:not(:disabled):hover {
+  background: #f3f4f6;
+}
+
+.pagination__icon-btn:not(:disabled):active {
+  background: #e5e7eb;
+}
+
+.pagination__nav-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 .status {

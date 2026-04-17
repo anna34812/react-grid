@@ -536,7 +536,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
         </div>
       </div>
 
-      <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} hasRows={hasRows} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} />
 
       {filterPopoverField ? (
         <ColumnFilterPopover
