@@ -9,7 +9,8 @@ const validateValue = (column, value) => {
   return "";
 };
 
-export const useInlineEdit = (setRows) => {
+export const useInlineEdit = (setRows, options = {}) => {
+  const apiOptions = options.apiOptions ?? {};
   const [editingCell, setEditingCell] = useState(null);
   const [draftValue, setDraftValue] = useState("");
   const [savingCell, setSavingCell] = useState(null);
@@ -45,7 +46,7 @@ export const useInlineEdit = (setRows) => {
     });
 
     try {
-      await patchRow(rowId, { [field]: nextValue });
+      await patchRow(rowId, { [field]: nextValue }, apiOptions);
       setEditingCell(null);
       setDraftValue("");
       return true;

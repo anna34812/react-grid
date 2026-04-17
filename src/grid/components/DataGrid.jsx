@@ -6,6 +6,7 @@ import { fetchDistinctColumnValues, patchRow } from "../api/gridApi";
 import { mergeColumnOrder, reorderFields } from "../utils/columnOrder";
 import { getColumnMinWidth, getColumnSections, getEffectivePin } from "../utils/columnPinning";
 import { reorderRowsById } from "../utils/rowOrder";
+import { computeTreeAggregates, flattenTreeRows, getIdsWithChildren } from "../utils/treeData";
 import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
 import { GridPagination } from "./GridPagination";
 import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
@@ -31,11 +32,16 @@ const mergeRowSelection = (partial) => {
   return rs;
 };
 
-export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true }) => {
+export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, treeData }) => {
   const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
-  const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
+  const gridQueryInitial = useMemo(() => {
+    if (!treeData?.enabled) return {};
+    return { treeMode: true, pageSize: treeData.pageSize ?? 50 };
+  }, [treeData?.enabled, treeData?.pageSize]);
+
+  const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
-  const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
+  const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: queryState.treeMode ?? false } });
   const [filterDraft, setFilterDraft] = useState({});
   const [filterPopoverField, setFilterPopoverField] = useState(null);
   const [distinctByField, setDistinctByField] = useState({});
@@ -45,6 +51,13 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
   const [internalColumnOrder, setInternalColumnOrder] = useState(() => mergeColumnOrder(undefined, columns));
   const [dragOverField, setDragOverField] = useState(null);
   const [dragOverRowId, setDragOverRowId] = useState(null);
+  const treeMode = Boolean(treeData?.enabled);
+  const treeParentField = treeData?.parentField ?? "parentId";
+  const treeRowIdField = treeData?.rowIdField ?? "id";
+  const treeExpandColumnField = treeData?.expandColumnField ?? "name";
+  const treeIndentPerLevel = treeData?.indentPerLevel ?? 16;
+  const [expandedRowIds, setExpandedRowIds] = useState(() => new Set());
+  const treeExpandInitRef = useRef(false);
   const editableClickSelectionTimerRef = useRef(null);
   const editedRowsRef = useRef(new Map());
   const [customSavingCell, setCustomSavingCell] = useState(null);
@@ -74,6 +87,46 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     const byField = Object.fromEntries(columns.map((c) => [c.field, c]));
     return displayOrder.map((f) => byField[f]).filter(Boolean);
   }, [columns, displayOrder]);
+
+  useEffect(() => {
+    if (!treeMode || !rows.length || treeExpandInitRef.current) return;
+    treeExpandInitRef.current = true;
+    setExpandedRowIds(getIdsWithChildren(rows, { idField: treeRowIdField, parentField: treeParentField }));
+  }, [treeMode, rows, treeRowIdField, treeParentField]);
+
+  const flattenedRows = useMemo(() => {
+    if (!treeMode) return rows;
+    return flattenTreeRows(rows, expandedRowIds, { idField: treeRowIdField, parentField: treeParentField });
+  }, [treeMode, rows, expandedRowIds, treeRowIdField, treeParentField]);
+
+  const displayRows = useMemo(() => {
+    if (!treeMode) return rows;
+    const start = (queryState.page - 1) * queryState.pageSize;
+    return flattenedRows.slice(start, start + queryState.pageSize);
+  }, [treeMode, rows, flattenedRows, queryState.page, queryState.pageSize]);
+
+  const treeAggregateMap = useMemo(() => {
+    if (!treeMode || !treeData?.aggregateValueField) return null;
+    return computeTreeAggregates(rows, {
+      valueField: treeData.aggregateValueField,
+      idField: treeRowIdField,
+      parentField: treeParentField,
+    });
+  }, [treeMode, rows, treeData?.aggregateValueField, treeRowIdField, treeParentField]);
+
+  useEffect(() => {
+    if (!treeMode) return;
+    setTotalCount(flattenedRows.length);
+  }, [treeMode, flattenedRows.length, setTotalCount]);
+
+  const toggleTreeExpand = useCallback((id) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const commitColumnOrder = useCallback(
     (next) => {
@@ -114,7 +167,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   const handleRowDrop = useCallback(
     (event, targetRowId) => {
-      if (!enableRowDrag) return;
+      if (!enableRowDrag || treeMode) return;
       event.preventDefault();
       event.stopPropagation();
       setDragOverRowId(null);
@@ -127,7 +180,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
         return next;
       });
     },
-    [enableRowDrag, setRows, onRowOrderChange],
+    [enableRowDrag, treeMode, setRows, onRowOrderChange],
   );
 
   const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
@@ -165,7 +218,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     return null;
   }, [leftColumns.length, centerColumns.length, rightColumns.length]);
 
-  const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const pageIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const gridSplitRowRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -184,7 +237,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
         headerTrs.forEach((tr) => (tr.style.height = `${maxHeader}px`));
       }
 
-      for (let i = 0; i < rows.length; i += 1) {
+      for (let i = 0; i < displayRows.length; i += 1) {
         const trs = [...rootEl.querySelectorAll(`tbody tr[data-sync-row-index="${i}"]`)];
         if (trs.length <= 1) continue;
         trs.forEach((tr) => (tr.style.height = ""));
@@ -209,7 +262,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
       cancelAnimationFrame(rafId);
       ro.disconnect();
     };
-  }, [hasSplit, rows]);
+  }, [hasSplit, displayRows]);
 
   const allSelectedOnPage = pageIds.length > 0 && pageIds.every((id) => selectedSet.has(id));
   const someSelectedOnPage = pageIds.some((id) => selectedSet.has(id)) && !allSelectedOnPage;
@@ -357,7 +410,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
         setFilterPopoverField(null);
         return;
       }
-      const vals = await fetchDistinctColumnValues(field);
+      const vals = await fetchDistinctColumnValues(field, { treeMode: queryState.treeMode ?? false });
       setDistinctByField((p) => ({ ...p, [field]: vals }));
       setFilterDraft((prev) => {
         const cur = prev[field] ?? {};
@@ -374,12 +427,13 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
       });
       setFilterPopoverField(field);
     },
-    [filterPopoverField, columns, queryState.filters],
+    [filterPopoverField, columns, queryState.filters, queryState.treeMode],
   );
 
-  const pageFrom = (queryState.page - 1) * queryState.pageSize + 1;
-  const pageTo = Math.min(queryState.page * queryState.pageSize, queryState.totalCount || 0);
-  const hasRows = rows.length > 0;
+  const effectiveTotal = treeMode ? flattenedRows.length : queryState.totalCount || 0;
+  const pageFrom = effectiveTotal === 0 ? 0 : (queryState.page - 1) * queryState.pageSize + 1;
+  const pageTo = Math.min(queryState.page * queryState.pageSize, effectiveTotal);
+  const hasRows = treeMode ? flattenedRows.length > 0 : rows.length > 0;
 
   const handleSort = (field) => {
     const direction = nextSortDirection(queryState.sortField, queryState.sortDirection, field);
@@ -427,7 +481,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
       });
 
       try {
-        await patchRow(row.id, { [column.field]: normalizedValue });
+        await patchRow(row.id, { [column.field]: normalizedValue }, { treeMode: queryState.treeMode ?? false });
         emitEditedRowsChange({ rowId: row.id, field: column.field, value: normalizedValue, previousRow: row });
         return true;
       } catch (_error) {
@@ -437,13 +491,13 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
         setCustomSavingCell(null);
       }
     },
-    [setRows, emitEditedRowsChange],
+    [setRows, emitEditedRowsChange, queryState.treeMode],
   );
 
   const renderCell = (row, column) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.field === column.field;
     const isSaving = (savingCell?.rowId === row.id && savingCell?.field === column.field) || (customSavingCell?.rowId === row.id && customSavingCell?.field === column.field);
-    const baseRenderParams = { row, column, value: row[column.field], isEditing, isSaving };
+    const baseRenderParams = { row, column, value: row[column.field], isEditing, isSaving, treeAggregate: treeAggregateMap?.get(row[treeRowIdField]) };
 
     if (isEditing) {
       const stopEditHostBubble = (event) => event.stopPropagation();
@@ -601,7 +655,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     if (sectionColumns.length === 0) return null;
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
-    const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
+    const showLeadingRowDrag = enableRowDrag && !treeMode && leadingPane === pane;
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
@@ -691,14 +745,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                                 return (
                                   <div className={`header-filter-inline${setSummary.isActive ? " header-filter-inline--set-active" : ""}`}>
                                     {setSummary.isActive ? (
-                                      <SetFilterSummaryReadonlyInput
-                                        count={setSummary.count}
-                                        values={setSummary.values}
-                                        columnLabel={column.label}
-                                        className={`header-filter-input header-filter-input--set-active`}
-                                        placeholder={`Filter ${column.label}`}
-                                        onClick={() => void toggleColumnFilterPopover(column.field)}
-                                      />
+                                      <SetFilterSummaryReadonlyInput count={setSummary.count} values={setSummary.values} columnLabel={column.label} className={`header-filter-input header-filter-input--set-active`} placeholder={`Filter ${column.label}`} onClick={() => void toggleColumnFilterPopover(column.field)} />
                                     ) : (
                                       <input
                                         className='header-filter-input'
@@ -721,13 +768,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                                         if (el) filterFunnelRefs.current[column.field] = el;
                                         else delete filterFunnelRefs.current[column.field];
                                       }}
-                                      className={[
-                                        "header-filter-funnel",
-                                        filterPopoverField === column.field ? "header-filter-funnel--open" : "",
-                                        setSummary.isActive ? "header-filter-funnel--active" : "",
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" ")}
+                                      className={["header-filter-funnel", filterPopoverField === column.field ? "header-filter-funnel--open" : "", setSummary.isActive ? "header-filter-funnel--active" : ""].filter(Boolean).join(" ")}
                                       aria-label={`Filter options for ${column.label}`}
                                       aria-expanded={filterPopoverField === column.field}
                                       onClick={(e) => {
@@ -773,7 +814,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, rowIndex) => {
+              {displayRows.map((row, rowIndex) => {
                 const rowSelected = selectedSet.has(row.id);
                 const rowDragOver = enableRowDrag && dragOverRowId === row.id;
                 return (
@@ -781,7 +822,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                     key={row.id}
                     role='row'
                     {...(hasSplit ? { "data-sync-row-index": rowIndex } : {})}
-                    className={[rowSelected ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : "", rowDragOver ? "data-grid-row--drag-over" : ""].filter(Boolean).join(" ") || undefined}
+                    className={[treeMode ? "data-grid-tree-row" : "", rowSelected ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : "", rowDragOver ? "data-grid-row--drag-over" : ""].filter(Boolean).join(" ") || undefined}
                     aria-selected={selectionEnabled ? rowSelected : undefined}
                     onClick={(event) => handleRowBackgroundClick(event, row.id)}
                     onDragOverCapture={
@@ -818,11 +859,45 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                         <input type='checkbox' checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
                       </td>
                     ) : null}
-                    {sectionColumns.map((column) => (
-                      <td key={`${row.id}-${column.field}`} style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
-                        {renderCell(row, column)}
-                      </td>
-                    ))}
+                    {sectionColumns.map((column) => {
+                      const cellInner = renderCell(row, column);
+                      const treeWrap = treeMode && column.field === treeExpandColumnField;
+                      return (
+                        <td key={`${row.id}-${column.field}`} style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
+                          {treeWrap ? (
+                            <div className='tree-cell' style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <span style={{ width: (row.__treeDepth ?? 0) * treeIndentPerLevel, flexShrink: 0 }} aria-hidden />
+                              {row.__treeHasChildren ? (
+                                <button
+                                  type='button'
+                                  className='tree-toggle'
+                                  data-no-row-select
+                                  aria-expanded={row.__treeExpanded}
+                                  aria-label={row.__treeExpanded ? "Collapse" : "Expand"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleTreeExpand(row[treeRowIdField]);
+                                  }}
+                                >
+                                  <span className='tree-toggle-icon' aria-hidden>
+                                    <svg viewBox='0 0 24 24' width='16' height='16' fill='currentColor' focusable='false'>
+                                      <path d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z' />
+                                    </svg>
+                                  </span>
+                                </button>
+                              ) : (
+                                <span className='tree-toggle-placeholder' aria-hidden style={{ width: 22, display: "inline-block", flexShrink: 0 }} />
+                              )}
+                              <div className='tree-cell-body' style={{ flex: 1, minWidth: 0 }}>
+                                {cellInner}
+                              </div>
+                            </div>
+                          ) : (
+                            cellInner
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}

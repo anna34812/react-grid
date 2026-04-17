@@ -1,4 +1,4 @@
-export const DEFAULT_QUERY_STATE = { page: 1, pageSize: 20, sortField: null, sortDirection: null, filters: {} };
+export const DEFAULT_QUERY_STATE = { page: 1, pageSize: 20, sortField: null, sortDirection: null, filters: {}, treeMode: false };
 
 export const serializeFilters = (filters) => JSON.stringify(filters ?? {});
 

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { DataGrid, DEFAULT_ROW_SELECTION } from "./grid/components/DataGrid";
+import { formatBytes } from "./grid/utils/treeData";
 import "./App.css";
 
 function App() {
@@ -58,6 +59,39 @@ function App() {
     [],
   );
 
+  const treeColumns = useMemo(
+    () => [
+      { field: "name", label: "File Explorer", editable: false, filterable: true, filterOperator: "contains", minWidth: 260, movable: true },
+      { field: "created", label: "Created", editable: false, filterable: false, minWidth: 110 },
+      { field: "modified", label: "Modified", editable: false, filterable: false, minWidth: 110 },
+      {
+        field: "sizeBytes",
+        label: "sum(Size)",
+        editable: false,
+        filterable: false,
+        minWidth: 120,
+        renderCell: ({ row, treeAggregate }) => {
+          if (row.kind === "folder") return <span className='cell-display'>{formatBytes(treeAggregate ?? 0)}</span>;
+          return <span className='cell-display'>{formatBytes(row.sizeBytes ?? 0)}</span>;
+        },
+      },
+    ],
+    [],
+  );
+
+  const treeDataConfig = useMemo(
+    () => ({
+      enabled: true,
+      parentField: "parentId",
+      rowIdField: "id",
+      expandColumnField: "name",
+      aggregateValueField: "sizeBytes",
+      pageSize: 50,
+      indentPerLevel: 14,
+    }),
+    [],
+  );
+
   return (
     <main className='app'>
       <h1>React Data Grid MVP</h1>
@@ -72,6 +106,12 @@ function App() {
       </p>
 
       <DataGrid columns={columns} enableColumnReorder enableRowDrag rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
+
+      <h2 style={{ marginTop: "2rem" }}>Tree data (file explorer)</h2>
+      <p>
+        Flat rows with <code>parentId</code>; <code>treeData</code> enables expand/collapse, depth indent, and optional <code>aggregateValueField</code> for folder totals (passed as <code>treeAggregate</code> to <code>renderCell</code>).
+      </p>
+      <DataGrid columns={treeColumns} treeData={treeDataConfig} enableColumnReorder rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} enableFiltering={enableFiltering} />
 
       <p className='selection-summary'>
         Selected: {selection.selectedIds.length > 0 ? selection.selectedIds.join(", ") : "none"}

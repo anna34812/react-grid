@@ -1,8 +1,13 @@
 import { mockRows } from "./data";
+import { treeFlatRows } from "./treeData";
 
 let dataStore = [...mockRows];
+let treeDataStore = [...treeFlatRows];
 
-export const resetDataStore = () => (dataStore = [...mockRows]);
+export const resetDataStore = () => {
+  dataStore = [...mockRows];
+  treeDataStore = [...treeFlatRows];
+};
 
 const applyFilters = (rows, filters) => {
   return rows.filter((row) => {
@@ -38,39 +43,46 @@ const applySort = (rows, sortField, sortDirection) => {
 };
 
 export async function fetchRows(queryState) {
-  const { page, pageSize, sortField, sortDirection, filters = {} } = queryState;
+  const { page, pageSize, sortField, sortDirection, filters = {}, treeMode } = queryState;
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  if (treeMode) {
+    const filteredRows = applyFilters(treeDataStore, filters);
+    return { rows: filteredRows, totalCount: filteredRows.length };
+  }
 
   const filteredRows = applyFilters(dataStore, filters);
   const sortedRows = applySort(filteredRows, sortField, sortDirection);
   const startIndex = (page - 1) * pageSize;
   const pagedRows = sortedRows.slice(startIndex, startIndex + pageSize);
 
-  await new Promise((resolve) => setTimeout(resolve, 200));
-
   return { rows: pagedRows, totalCount: sortedRows.length };
 }
 
 /** Unique string values for a column (full dataset, for filter UI). */
-export function getDistinctColumnValues(field) {
+export function getDistinctColumnValues(field, sourceRows = dataStore) {
   const seen = new Set();
-  for (const row of dataStore) {
+  for (const row of sourceRows) {
     const v = row[field];
     if (v !== undefined && v !== null) seen.add(String(v));
   }
   return [...seen].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-export async function fetchDistinctColumnValues(field) {
+export async function fetchDistinctColumnValues(field, options = {}) {
   await new Promise((r) => setTimeout(r, 0));
-  return getDistinctColumnValues(field);
+  const source = options.treeMode ? treeDataStore : dataStore;
+  return getDistinctColumnValues(field, source);
 }
 
-export async function updateRow(id, updates) {
-  const rowIndex = dataStore.findIndex((row) => row.id === id);
+export async function updateRow(id, updates, options = {}) {
+  const store = options.treeMode ? treeDataStore : dataStore;
+  const rowIndex = store.findIndex((row) => row.id === id);
   if (rowIndex < 0) throw new Error("Row not found");
 
-  const updatedRow = { ...dataStore[rowIndex], ...updates };
-  dataStore[rowIndex] = updatedRow;
+  const updatedRow = { ...store[rowIndex], ...updates };
+  store[rowIndex] = updatedRow;
 
   await new Promise((resolve) => setTimeout(resolve, 150));
 
