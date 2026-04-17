@@ -133,6 +133,11 @@
   align-items: center;
 }
 
+.tree-grid-header-cell {
+  position: relative;
+  overflow: visible;
+}
+
 .tree-grid-header-cell:last-child,
 .tree-grid-cell:last-child {
   border-right: none;
@@ -302,6 +307,10 @@
   min-width: 0;
 }
 
+.data-grid-header-cell {
+  position: relative;
+}
+
 .data-grid-header-cell,
 .data-grid-cell {
   border-bottom: 1px solid #e5e7eb;
@@ -362,7 +371,9 @@ input[type="checkbox"].grid-checkbox {
   background-size: 12px 12px;
   cursor: pointer;
   vertical-align: middle;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 input[type="checkbox"].grid-checkbox:hover:not(:disabled) {
@@ -456,13 +467,67 @@ input[type="checkbox"].grid-checkbox:focus-visible {
   cursor: pointer;
 }
 
+/* Column resize (header drag grip) */
+.column-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 10px;
+  height: 52%;
+  min-height: 22px;
+  margin-right: -5px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.column-resize-handle::after {
+  content: "";
+  display: block;
+  width: 2px;
+  height: 100%;
+  max-height: 22px;
+  background: #ccc;
+  border-radius: 1px;
+}
+
+.column-resize-handle:hover::after,
+.column-resize-handle:focus-visible::after {
+  background: #2563eb;
+}
+
+.data-grid--column-resizing,
+.tree-data-grid--column-resizing {
+  cursor: col-resize;
+}
+
+.data-grid-header-cell.column-th--resizing,
+.tree-grid-header-cell.column-th--resizing {
+  user-select: none;
+}
+
 .header-filter {
   min-width: 0;
 }
 
 .header-cell--title-row {
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+  width: 100%;
+}
+
+.header-cell--title-row .header-button {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
 }
 
 .header-column-menu-btn {
@@ -624,11 +689,15 @@ input[type="checkbox"].grid-checkbox:focus-visible {
 .header-filter-input {
   box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   min-height: 32px;
   padding: 6px 8px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-filter-spacer {
@@ -722,11 +791,15 @@ input[type="checkbox"].grid-checkbox:focus-visible {
 
 .cell-button {
   width: 100%;
+  min-width: 0;
   border: none;
   background: transparent;
   text-align: left;
   cursor: pointer;
   padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cell-button--editable {
@@ -748,9 +821,13 @@ input[type="checkbox"].grid-checkbox:focus-visible {
 .cell-display {
   display: block;
   width: 100%;
+  min-width: 0;
   text-align: left;
   padding: 0;
   color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .edit-cell {

@@ -4,6 +4,7 @@ import {
   getColumnSections,
   getDisplayColumns,
   getEffectivePin,
+  isColumnResizable,
 } from './columnPinning'
 
 describe('columnPinning', () => {
@@ -51,5 +52,11 @@ describe('columnPinning', () => {
     expect(getColumnMinWidth({ field: 'a', width: 99 })).toBe(99)
     expect(getColumnMinWidth({ field: 'a', minWidth: 88 })).toBe(88)
     expect(getColumnMinWidth({ field: 'a' })).toBe(140)
+  })
+
+  it('isColumnResizable defaults true unless resizable is false', () => {
+    expect(isColumnResizable({ field: 'a' })).toBe(true)
+    expect(isColumnResizable({ field: 'a', resizable: true })).toBe(true)
+    expect(isColumnResizable({ field: 'a', resizable: false })).toBe(false)
   })
 })

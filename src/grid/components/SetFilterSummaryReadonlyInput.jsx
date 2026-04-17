@@ -4,7 +4,7 @@ import { fitSetFilterDisplayText } from "../utils/setFilterDisplayText";
 const canvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
 const canvasCtx = canvas?.getContext("2d");
 
-export function SetFilterSummaryReadonlyInput({ count, values, columnLabel, className, placeholder, onClick }) {
+export const SetFilterSummaryReadonlyInput = ({ count, values, columnLabel, className, placeholder, onClick }) => {
   const inputRef = useRef(null);
   const valuesRef = useRef(values);
   valuesRef.current = values;
@@ -53,18 +53,5 @@ export function SetFilterSummaryReadonlyInput({ count, values, columnLabel, clas
     return () => ro.disconnect();
   }, [recompute]);
 
-  return (
-    <input
-      ref={inputRef}
-      type='text'
-      className={className}
-      placeholder={placeholder}
-      readOnly
-      aria-readOnly
-      aria-label={`${columnLabel} filter: ${count} values selected`}
-      value={text}
-      onChange={() => {}}
-      onClick={onClick}
-    />
-  );
-}
+  return <input ref={inputRef} type='text' className={className} placeholder={placeholder} readOnly aria-readOnly aria-label={`${columnLabel} filter: ${count} values selected`} value={text} onChange={() => {}} onClick={onClick} />;
+};

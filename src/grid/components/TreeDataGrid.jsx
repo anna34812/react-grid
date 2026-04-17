@@ -3,7 +3,7 @@ import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
 import { patchRow } from "../api/gridApi";
-import { getColumnMinWidth, getEffectivePin } from "../utils/columnPinning";
+import { getColumnMinWidth, getEffectivePin, isColumnResizable } from "../utils/columnPinning";
 import { nextSortDirection } from "../utils/gridSort";
 import { buildGridTemplateColumns } from "../utils/gridTemplateColumns";
 import { collectSubtreeIds, computeTreeAggregates, flattenTreeRows, getChildrenMap, getIdsWithChildren } from "../utils/treeData";
@@ -12,7 +12,9 @@ import { useGridEditFocus } from "../hooks/useGridEditFocus";
 import { useGridFilters } from "../hooks/useGridFilters";
 import { useGridRowSelection } from "../hooks/useGridRowSelection";
 import { useGridSplitSync } from "../hooks/useGridSplitSync";
+import { useGridColumnResize } from "../hooks/useGridColumnResize";
 import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
+import { ColumnResizeHandle } from "./ColumnResizeHandle";
 import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 
 /** Re-export for convenience; same shape as DataGrid. */
@@ -28,11 +30,13 @@ const TREE_ROW_STAGGER_MS = 32;
  * `treeData.groupSelection`: `'self'` (row only) or `'descendants'` (parent checkbox selects subtree). `treeData.showGroupSelectionControl` (default true): toolbar to switch modes.
  *
  * `animateRows`: each body row uses `0fr → 1fr` on mount (expand) and `1fr → 0fr` before removal (collapse). Set `false` for instant show/hide.
+ * Columns may set `resizable: false` to disable resize grip and double-click auto-fit for that column.
  */
-export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true }) => {
+export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true, enableColumnResize = true }) => {
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
   const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
+  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize });
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: true } });
   const treeParentField = treeDataConfig.parentField ?? "parentId";
@@ -435,7 +439,11 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     );
   };
 
-  const columnStyle = (column) => ({ minWidth: getColumnMinWidth(column) });
+  const columnStyle = (column) => {
+    const minW = getColumnMinWidth(column);
+    const w = columnWidths[column.field] ?? minW;
+    return { minWidth: Math.max(minW, w) };
+  };
 
   /** When a subset "in" filter is active, show count + value list (width-fitted) and funnel badge. */
   const getSetFilterSummary = (field) => {
@@ -465,12 +473,12 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     if (sectionColumns.length === 0) return null;
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
-    const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect });
+    const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect, columnWidths });
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
         <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
-          <div className='tree-data-grid' role='grid' aria-rowcount={flattenedRows.length} aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}>
+          <div className={["tree-data-grid", resizingField ? "tree-data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined} role='grid' aria-rowcount={flattenedRows.length} aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}>
             <div className='tree-data-grid-header' role='rowgroup'>
               <div className='tree-data-grid-header-row' role='row' {...(hasSplit ? { "data-tree-sync-header": "" } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingSelect ? (
@@ -493,7 +501,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                   const pin = getEffectivePin(column, pinnedOverrides);
                   const dragOver = enableColumnReorder && dragOverField === column.field;
                   const headerDrag = enableColumnReorder && column.movable === true;
-                  const thClassName = [dragOver && "column-th--drag-over", headerDrag && "column-th--movable"].filter(Boolean).join(" ") || undefined;
+                  const thClassName = [dragOver && "column-th--drag-over", headerDrag && "column-th--movable", resizingField === column.field && "column-th--resizing"].filter(Boolean).join(" ") || undefined;
                   return (
                     <div
                       key={column.field}
@@ -608,6 +616,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                           </div>
                         </div>
                       )}
+                      <ColumnResizeHandle column={column} enabled={enableColumnResize && isColumnResizable(column)} onResizeStart={startResize} onAutoFit={autoFitColumn} />
                     </div>
                   );
                 })}

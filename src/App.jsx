@@ -30,6 +30,7 @@ function App() {
         filterOperator: "contains",
         minWidth: 220,
         movable: true,
+        resizable: false,
         renderEditCell: ({ value, setValue, save, cancel, isSaving }) => <input value={value} disabled={isSaving} onChange={(e) => setValue(e.target.value)} />,
       },
       {

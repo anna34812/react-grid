@@ -4,6 +4,9 @@ export const getColumnMinWidth = (column) => {
   return 140;
 };
 
+/** Column resize handle + double-click auto-fit; set `resizable: false` to disable. */
+export const isColumnResizable = (column) => column != null && column.resizable !== false;
+
 export const getEffectivePin = (column, pinnedOverrides) => {
   if (Object.prototype.hasOwnProperty.call(pinnedOverrides, column.field)) return pinnedOverrides[column.field];
   return column.pinned ?? null;

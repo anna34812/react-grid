@@ -3,7 +3,7 @@ import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
 import { patchRow } from "../api/gridApi";
-import { getColumnMinWidth, getEffectivePin } from "../utils/columnPinning";
+import { getColumnMinWidth, getEffectivePin, isColumnResizable } from "../utils/columnPinning";
 import { nextSortDirection } from "../utils/gridSort";
 import { buildGridTemplateColumns } from "../utils/gridTemplateColumns";
 import { reorderRowsById } from "../utils/rowOrder";
@@ -12,15 +12,19 @@ import { useGridEditFocus } from "../hooks/useGridEditFocus";
 import { useGridFilters } from "../hooks/useGridFilters";
 import { useGridRowSelection } from "../hooks/useGridRowSelection";
 import { useGridSplitSync } from "../hooks/useGridSplitSync";
+import { useGridColumnResize } from "../hooks/useGridColumnResize";
 import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
+import { ColumnResizeHandle } from "./ColumnResizeHandle";
 import { GridPagination } from "./GridPagination";
 import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 
 /** Re-export for apps that imported `DEFAULT_ROW_SELECTION` from `DataGrid`. */
 export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
 
-export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true }) => {
+/** Column defs may set `resizable: false` to hide resize grip and double-click auto-fit for that column. */
+export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true }) => {
   const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
+  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize });
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
   const [dragOverRowId, setDragOverRowId] = useState(null);
@@ -263,7 +267,11 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     );
   };
 
-  const columnStyle = (column) => ({ minWidth: getColumnMinWidth(column) });
+  const columnStyle = (column) => {
+    const minW = getColumnMinWidth(column);
+    const w = columnWidths[column.field] ?? minW;
+    return { minWidth: Math.max(minW, w) };
+  };
 
   /** When a subset "in" filter is active, show count + value list (width-fitted) and funnel badge. */
   const getSetFilterSummary = (field) => {
@@ -294,13 +302,13 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
-    const colTpl = buildGridTemplateColumns(sectionColumns, { showRowDrag: showLeadingRowDrag, showSelect: showLeadingSelect });
+    const colTpl = buildGridTemplateColumns(sectionColumns, { showRowDrag: showLeadingRowDrag, showSelect: showLeadingSelect, columnWidths });
     const ariaColCount = sectionColumns.length + (showLeadingSelect ? 1 : 0) + (showLeadingRowDrag ? 1 : 0);
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
         <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
-          <div className='data-grid' role='grid' aria-rowcount={rows.length} aria-colcount={ariaColCount}>
+          <div className={["data-grid", resizingField ? "data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined} role='grid' aria-rowcount={rows.length} aria-colcount={ariaColCount}>
             <div className='data-grid-header' role='presentation'>
               <div className='data-grid-header-row' role='row' {...(hasSplit ? { "data-sync-header": "" } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingRowDrag ? (
@@ -332,7 +340,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                   const pin = getEffectivePin(column, pinnedOverrides);
                   const dragOver = enableColumnReorder && dragOverField === column.field;
                   const headerDrag = enableColumnReorder && column.movable === true;
-                  const thClassName = [dragOver && "column-th--drag-over", headerDrag && "column-th--movable"].filter(Boolean).join(" ") || undefined;
+                  const thClassName = [dragOver && "column-th--drag-over", headerDrag && "column-th--movable", resizingField === column.field && "column-th--resizing"].filter(Boolean).join(" ") || undefined;
                   return (
                     <div
                       key={column.field}
@@ -447,6 +455,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                           </div>
                         </div>
                       )}
+                      <ColumnResizeHandle column={column} enabled={enableColumnResize && isColumnResizable(column)} onResizeStart={startResize} onAutoFit={autoFitColumn} />
                     </div>
                   );
                 })}
