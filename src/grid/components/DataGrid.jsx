@@ -316,13 +316,13 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                   <div role='columnheader' className='data-grid-header-cell grid-select-header' style={{ width: 44, minWidth: 44 }} data-field='__select__'>
                     {enableFiltering ? (
                       <div className='header-stack'>
-                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all rows on this page' checked={allSelectedInView} ref={(el) => el && (el.indeterminate = someSelectedInView)} onChange={toggleSelectAllInView} /> : null}</div>
+                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input className='grid-checkbox' type='checkbox' aria-label='Select all rows on this page' checked={allSelectedInView} ref={(el) => el && (el.indeterminate = someSelectedInView)} onChange={toggleSelectAllInView} /> : null}</div>
                         <div className='header-filter'>
                           <span className='header-filter-spacer' aria-hidden />
                         </div>
                       </div>
                     ) : (
-                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all rows on this page' checked={allSelectedInView} ref={(el) => el && (el.indeterminate = someSelectedInView)} onChange={toggleSelectAllInView} /> : null}</div>
+                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input className='grid-checkbox' type='checkbox' aria-label='Select all rows on this page' checked={allSelectedInView} ref={(el) => el && (el.indeterminate = someSelectedInView)} onChange={toggleSelectAllInView} /> : null}</div>
                     )}
                   </div>
                 ) : null}
@@ -496,7 +496,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                     ) : null}
                     {showLeadingSelect ? (
                       <div role='gridcell' className='data-grid-cell grid-select-cell' data-field='__select__' data-no-row-select>
-                        <input type='checkbox' checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
+                        <input className='grid-checkbox' type='checkbox' checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
                       </div>
                     ) : null}
                     {sectionColumns.map((column) => (

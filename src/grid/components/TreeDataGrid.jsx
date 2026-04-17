@@ -477,13 +477,13 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                   <div className='tree-grid-header-cell tree-grid-header-cell--select' role='columnheader' data-field='__select__'>
                     {enableFiltering ? (
                       <div className='header-stack'>
-                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
+                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input className='grid-checkbox' type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
                         <div className='header-filter'>
                           <span className='header-filter-spacer' aria-hidden />
                         </div>
                       </div>
                     ) : (
-                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
+                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input className='grid-checkbox' type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
                     )}
                   </div>
                 ) : null}
@@ -633,6 +633,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                     {showLeadingSelect ? (
                       <div className='tree-grid-cell tree-grid-cell--select' role='gridcell' data-field='__select__' data-no-row-select>
                         <input
+                          className='grid-checkbox'
                           type='checkbox'
                           checked={checkboxChecked}
                           ref={(el) => {
