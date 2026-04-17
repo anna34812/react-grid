@@ -1,66 +1,97 @@
-import { DataGrid } from './grid/components/DataGrid'
-import './App.css'
+import { useCallback, useState } from "react";
+import { DataGrid, DEFAULT_ROW_SELECTION } from "./grid/components/DataGrid";
+import "./App.css";
 
 function App() {
+  const [selection, setSelection] = useState({
+    selectedIds: [],
+    selectedRows: [],
+  });
+
+  const onSelectionChange = useCallback((detail) => {
+    setSelection({
+      selectedIds: detail.selectedIds,
+      selectedRows: detail.selectedRows,
+    });
+  }, []);
+
   const columns = [
     {
-      field: 'id',
-      label: 'ID',
+      field: "id",
+      label: "ID",
       editable: false,
       filterable: false,
-      pinned: 'left',
+      pinned: "left",
       minWidth: 72,
     },
     {
-      field: 'name',
-      label: 'Name',
+      field: "name",
+      label: "Name",
       editable: true,
       required: true,
       filterable: true,
-      filterOperator: 'contains',
+      filterOperator: "contains",
       minWidth: 160,
     },
     {
-      field: 'email',
-      label: 'Email',
+      field: "email",
+      label: "Email",
       editable: true,
       required: true,
       filterable: true,
-      filterOperator: 'contains',
+      filterOperator: "contains",
       minWidth: 220,
     },
     {
-      field: 'status',
-      label: 'Status',
+      field: "status",
+      label: "Status",
       editable: true,
       required: true,
       filterable: true,
-      filterOperator: 'eq',
+      filterOperator: "eq",
       minWidth: 120,
     },
     {
-      field: 'score',
-      label: 'Score',
-      type: 'number',
+      field: "score",
+      label: "Score",
+      type: "number",
       editable: true,
       filterable: true,
-      filterOperator: 'gte',
-      pinned: 'right',
+      filterOperator: "gte",
+      pinned: "right",
       minWidth: 96,
     },
-  ]
+  ];
 
   return (
     <main className="app">
       <h1>React Data Grid MVP</h1>
       <p>
-        Server-side pagination + sorting + inline edit + filtering (inside column headers) + column pinning:
-        when any column is pinned, each pane keeps a horizontal scrollbar; with no pins, horizontal scroll appears
-        only if content overflows. Shared vertical scroll (L / R in headers).
+        Row selection: <code>rowSelection</code> (
+        <code>DEFAULT_ROW_SELECTION</code> + overrides) and a separate{" "}
+        <code>onSelectionChange</code> prop.
       </p>
-      <DataGrid columns={columns} />
+      <DataGrid
+        columns={columns}
+        rowSelection={{
+          ...DEFAULT_ROW_SELECTION,
+          mode: "multi",
+          checkboxes: true,
+          enableClickSelection: true,
+        }}
+        onSelectionChange={onSelectionChange}
+      />
+      <p className="selection-summary">
+        Selected:{" "}
+        {selection.selectedIds.length > 0
+          ? selection.selectedIds.join(", ")
+          : "none"}
+        {selection.selectedRows.length > 0 && (
+          <span> ({selection.selectedRows.map((r) => r.name).join(", ")})</span>
+        )}
+      </p>
     </main>
-  )
+  );
 }
 
-export default App
+export default App;

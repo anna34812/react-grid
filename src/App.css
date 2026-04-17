@@ -109,6 +109,36 @@
   gap: 8px;
 }
 
+.header-cell--select {
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-select-header,
+.grid-select-cell {
+  background: #fafafa;
+}
+
+.grid-select-cell {
+  vertical-align: middle;
+  text-align: center;
+  width: 44px;
+  min-width: 44px;
+}
+
+.data-grid-row--selected .grid-select-cell {
+  background: #e0e7ff;
+}
+
+.data-grid-row--selected td:not(.grid-select-cell) {
+  background: #eef2ff;
+}
+
+.data-grid-row--clickable {
+  cursor: pointer;
+}
+
 .header-filter {
   min-width: 0;
 }
@@ -174,6 +204,30 @@
   padding: 0;
 }
 
+.cell-button--editable {
+  display: block;
+  box-sizing: border-box;
+  touch-action: manipulation;
+  user-select: none;
+  color: inherit;
+  font: inherit;
+  border-radius: 4px;
+}
+
+.cell-button--editable:focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+.cell-display {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+}
+
 .edit-cell {
   display: flex;
   flex-direction: column;
@@ -199,4 +253,10 @@
 
 .status.error {
   color: #b91c1c;
+}
+
+.selection-summary {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #374151;
 }

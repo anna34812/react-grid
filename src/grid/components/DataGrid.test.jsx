@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DataGrid } from './DataGrid'
 import { resetDataStore } from '../mock/server'
 
@@ -51,7 +51,7 @@ describe('DataGrid', () => {
   it('edits a cell value inline', async () => {
     render(<DataGrid columns={columns} />)
     const originalCell = await screen.findByRole('button', { name: 'User 1' })
-    await userEvent.click(originalCell)
+    await userEvent.dblClick(originalCell)
 
     const input = screen.getByDisplayValue('User 1')
     await userEvent.clear(input)
@@ -122,5 +122,86 @@ describe('DataGrid', () => {
     )
 
     expect(headerFields.at(-1)).toBe('id')
+  })
+
+  it('supports multi selection and reports selected rows', async () => {
+    const onSelectionChange = vi.fn()
+    render(
+      <DataGrid
+        columns={columns}
+        rowSelection={{
+          mode: 'multi',
+          checkboxes: true,
+          enableClickSelection: false,
+        }}
+        onSelectionChange={onSelectionChange}
+      />,
+    )
+    await screen.findByText('User 1')
+
+    const rowChecks = screen.getAllByRole('checkbox', { name: /^Select row / })
+    expect(rowChecks.length).toBeGreaterThan(1)
+    await userEvent.click(rowChecks[0])
+    await userEvent.click(rowChecks[1])
+
+    const last = onSelectionChange.mock.calls.at(-1)[0]
+    expect(last.selectedIds).toEqual([1, 2])
+    expect(last.selectedRows.map((r) => r.id)).toEqual([1, 2])
+  })
+
+  it('single selection keeps one row at a time', async () => {
+    const onSelectionChange = vi.fn()
+    render(
+      <DataGrid
+        columns={columns}
+        rowSelection={{
+          mode: 'single',
+          checkboxes: true,
+        }}
+        onSelectionChange={onSelectionChange}
+      />,
+    )
+    await screen.findByText('User 1')
+
+    const rowChecks = screen.getAllByRole('checkbox', { name: /^Select row / })
+    await userEvent.click(rowChecks[0])
+    await userEvent.click(rowChecks[1])
+
+    const last = onSelectionChange.mock.calls.at(-1)[0]
+    expect(last.selectedIds).toEqual([2])
+  })
+
+  it('hides the select column when checkboxes is false; plain click replaces selection, Ctrl+click adds', async () => {
+    const onSelectionChange = vi.fn()
+    const { container } = render(
+      <DataGrid
+        columns={columns}
+        rowSelection={{
+          mode: 'multi',
+          checkboxes: false,
+          enableClickSelection: true,
+        }}
+        onSelectionChange={onSelectionChange}
+      />,
+    )
+    await screen.findByText('User 1')
+    expect(container.querySelector('[data-field="__select__"]')).toBeNull()
+
+    const row1Id = container.querySelector(
+      'tbody tr td[data-field="id"] .cell-display',
+    )
+    const row2Id = container.querySelector(
+      'tbody tr:nth-child(2) td[data-field="id"] .cell-display',
+    )
+
+    await userEvent.click(row1Id)
+    expect(onSelectionChange.mock.calls.at(-1)[0].selectedIds).toEqual([1])
+
+    await userEvent.click(row2Id)
+    expect(onSelectionChange.mock.calls.at(-1)[0].selectedIds).toEqual([2])
+
+    await userEvent.click(row1Id)
+    fireEvent.click(row2Id, { ctrlKey: true, bubbles: true })
+    expect(onSelectionChange.mock.calls.at(-1)[0].selectedIds).toEqual([1, 2])
   })
 })
