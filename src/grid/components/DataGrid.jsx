@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
@@ -52,6 +52,7 @@ export function DataGrid({
   columns,
   rowSelection: rowSelectionProp,
   onSelectionChange,
+  onEditedRowsChange,
   enableFiltering = true,
 }) {
   const rs = useMemo(
@@ -84,6 +85,8 @@ export function DataGrid({
   } = useInlineEdit(setRows);
   const [filterDraft, setFilterDraft] = useState({});
   const [pinnedOverrides, setPinnedOverrides] = useState({});
+  const editableClickSelectionTimerRef = useRef(null);
+  const editedRowsRef = useRef(new Map());
 
   const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
   const showSelectColumn = selectionEnabled && rs.checkboxes;
@@ -273,6 +276,14 @@ export function DataGrid({
   };
 
   useEffect(() => {
+    return () => {
+      if (editableClickSelectionTimerRef.current) {
+        clearTimeout(editableClickSelectionTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!enableFiltering) {
       setFilterDraft({});
       clearFilters();
@@ -318,6 +329,42 @@ export function DataGrid({
     setSort(field, direction);
   };
 
+  const emitEditedRowsChange = useCallback(
+    ({ rowId, field, value, previousRow }) => {
+      const nextEditedRow = { ...previousRow, [field]: value };
+      editedRowsRef.current.set(rowId, nextEditedRow);
+      const editedRows = [...editedRowsRef.current.values()];
+      onEditedRowsChange?.({
+        currentEditedRow: nextEditedRow,
+        editedRows,
+      });
+    },
+    [onEditedRowsChange],
+  );
+
+  const handleSaveEdit = useCallback(
+    async ({ row, column }) => {
+      const previousRow = row;
+      const nextValue =
+        column.type === "number" ? Number(draftValue) : draftValue;
+      const didSave = await saveEdit({
+        rowId: row.id,
+        field: column.field,
+        column,
+      });
+      if (!didSave) {
+        return;
+      }
+      emitEditedRowsChange({
+        rowId: row.id,
+        field: column.field,
+        value: nextValue,
+        previousRow,
+      });
+    },
+    [draftValue, saveEdit, emitEditedRowsChange],
+  );
+
   const renderCell = (row, column) => {
     const isEditing =
       editingCell?.rowId === row.id && editingCell?.field === column.field;
@@ -327,6 +374,27 @@ export function DataGrid({
     if (isEditing) {
       const stopEditHostBubble = (event) => {
         event.stopPropagation();
+      };
+      const commitEditIfChanged = () => {
+        if (isSaving) {
+          return false;
+        }
+        const previousValue =
+          row[column.field] == null ? "" : String(row[column.field]);
+        if (draftValue === previousValue) {
+          cancelEdit();
+          return true;
+        }
+        void handleSaveEdit({ row, column });
+        return true;
+      };
+      const handleEditInputBlur = (event) => {
+        const editHost = event.currentTarget.closest("[data-edit-host]");
+        const nextFocused = event.relatedTarget;
+        if (nextFocused && editHost?.contains(nextFocused)) {
+          return;
+        }
+        commitEditIfChanged();
       };
       return (
         <div
@@ -345,20 +413,35 @@ export function DataGrid({
             }}
             onClick={stopEditHostBubble}
             onPointerDown={stopEditHostBubble}
+            onBlur={handleEditInputBlur}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.stopPropagation();
+                commitEditIfChanged();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelEdit();
+              }
+            }}
           />
-          <div className="edit-actions">
+          {/* <div className="edit-actions">
             <button
               type="button"
+              tabIndex={-1}
               disabled={isSaving}
               onClick={(e) => {
                 e.stopPropagation();
-                saveEdit({ rowId: row.id, field: column.field, column });
+                void handleSaveEdit({ row, column });
               }}
             >
               Save
             </button>
             <button
               type="button"
+              tabIndex={-1}
               disabled={isSaving}
               onClick={(e) => {
                 e.stopPropagation();
@@ -367,7 +450,7 @@ export function DataGrid({
             >
               Cancel
             </button>
-          </div>
+          </div> */}
         </div>
       );
     }
@@ -393,13 +476,23 @@ export function DataGrid({
           if (e.detail >= 2) {
             return;
           }
-          applySelectionForRowClick(
-            { ctrlKey: e.ctrlKey, metaKey: e.metaKey },
-            row.id,
-          );
+          if (editableClickSelectionTimerRef.current) {
+            clearTimeout(editableClickSelectionTimerRef.current);
+          }
+          editableClickSelectionTimerRef.current = setTimeout(() => {
+            applySelectionForRowClick(
+              { ctrlKey: e.ctrlKey, metaKey: e.metaKey },
+              row.id,
+            );
+            editableClickSelectionTimerRef.current = null;
+          }, 180);
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
+          if (editableClickSelectionTimerRef.current) {
+            clearTimeout(editableClickSelectionTimerRef.current);
+            editableClickSelectionTimerRef.current = null;
+          }
           if (isSaving) {
             return;
           }

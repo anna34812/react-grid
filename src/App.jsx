@@ -8,11 +8,24 @@ function App() {
     selectedIds: [],
     selectedRows: [],
   });
+  const [editedState, setEditedState] = useState({
+    currentEditedRow: null,
+    editedRows: [],
+  });
 
   const onSelectionChange = useCallback((detail) => {
     setSelection({
       selectedIds: detail.selectedIds,
       selectedRows: detail.selectedRows,
+    });
+  }, []);
+
+  const onEditedRowsChange = useCallback((detail) => {
+    console.log("onEditedRowsChange", detail);
+
+    setEditedState({
+      currentEditedRow: detail.currentEditedRow,
+      editedRows: detail.editedRows,
     });
   }, []);
 
@@ -89,9 +102,10 @@ function App() {
           ...DEFAULT_ROW_SELECTION,
           mode: "multi",
           checkboxes: true,
-          enableClickSelection: true,
+          enableClickSelection: false,
         }}
         onSelectionChange={onSelectionChange}
+        onEditedRowsChange={onEditedRowsChange}
         enableFiltering={enableFiltering}
       />
       <p className="selection-summary">
@@ -102,6 +116,13 @@ function App() {
         {selection.selectedRows.length > 0 && (
           <span> ({selection.selectedRows.map((r) => r.name).join(", ")})</span>
         )}
+      </p>
+      <p className="selection-summary">
+        Last edited row:{" "}
+        {editedState.currentEditedRow
+          ? editedState.currentEditedRow.id
+          : "none"}{" "}
+        / Edited rows total: {editedState.editedRows.length}
       </p>
     </main>
   );

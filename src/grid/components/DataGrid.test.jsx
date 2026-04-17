@@ -56,9 +56,85 @@ describe('DataGrid', () => {
     const input = screen.getByDisplayValue('User 1')
     await userEvent.clear(input)
     await userEvent.type(input, 'Updated User')
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.keyboard('{Enter}')
 
     expect(await screen.findByRole('button', { name: 'Updated User' })).toBeInTheDocument()
+  })
+
+  it('does not select row on editable-cell double click', async () => {
+    const onSelectionChange = vi.fn()
+    render(
+      <DataGrid
+        columns={columns}
+        rowSelection={{
+          mode: 'multi',
+          checkboxes: false,
+          enableClickSelection: true,
+        }}
+        onSelectionChange={onSelectionChange}
+      />,
+    )
+
+    const editableCell = await screen.findByRole('button', { name: 'User 1' })
+    await userEvent.dblClick(editableCell)
+
+    await waitFor(() => {
+      const last = onSelectionChange.mock.calls.at(-1)?.[0]
+      expect(last?.selectedIds ?? []).toEqual([])
+    })
+  })
+
+  it('reports current edited row and cumulative edited rows', async () => {
+    const onEditedRowsChange = vi.fn()
+    render(<DataGrid columns={columns} onEditedRowsChange={onEditedRowsChange} />)
+
+    const firstRowName = await screen.findByRole('button', { name: 'User 1' })
+    await userEvent.dblClick(firstRowName)
+    let input = screen.getByDisplayValue('User 1')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Edited User 1')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByRole('button', { name: 'Edited User 1' })
+
+    const secondRowName = await screen.findByRole('button', { name: 'User 2' })
+    await userEvent.dblClick(secondRowName)
+    input = screen.getByDisplayValue('User 2')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Edited User 2')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByRole('button', { name: 'Edited User 2' })
+
+    const lastPayload = onEditedRowsChange.mock.calls.at(-1)[0]
+    expect(lastPayload.currentEditedRow.id).toBe(2)
+    expect(lastPayload.editedRows.map((row) => row.id)).toEqual([1, 2])
+  })
+
+  it('auto-saves edit on focus out by click, tab, or enter', async () => {
+    render(<DataGrid columns={columns} />)
+
+    const firstRowName = await screen.findByRole('button', { name: 'User 1' })
+    await userEvent.dblClick(firstRowName)
+    let input = screen.getByDisplayValue('User 1')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Blur Saved User')
+    await userEvent.click(screen.getByRole('button', { name: 'ID' }))
+    await screen.findByRole('button', { name: 'Blur Saved User' })
+
+    const secondRowName = await screen.findByRole('button', { name: 'User 2' })
+    await userEvent.dblClick(secondRowName)
+    input = screen.getByDisplayValue('User 2')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Tab Saved User')
+    await userEvent.tab()
+    await screen.findByRole('button', { name: 'Tab Saved User' })
+
+    const thirdRowName = await screen.findByRole('button', { name: 'User 3' })
+    await userEvent.dblClick(thirdRowName)
+    input = screen.getByDisplayValue('User 3')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Enter Saved User')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByRole('button', { name: 'Enter Saved User' })
   })
 
   it('filters by exact status', async () => {
