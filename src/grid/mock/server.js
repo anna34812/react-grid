@@ -8,8 +8,11 @@ const applyFilters = (rows, filters) => {
   return rows.filter((row) => {
     return Object.entries(filters).every(([field, filter]) => {
       if (!filter || filter.value === undefined || filter.value === "") return true;
+      if (Array.isArray(filter.value) && filter.value.length === 0) return false;
 
       const rawValue = row[field];
+      if (filter.operator === "in" && Array.isArray(filter.value)) return filter.value.some((v) => v == rawValue || String(v) === String(rawValue));
+
       const rowValue = rawValue == null ? "" : String(rawValue).toLowerCase();
       const filterValue = String(filter.value).toLowerCase();
       if (filter.operator === "eq") return rowValue === filterValue;
@@ -45,6 +48,21 @@ export async function fetchRows(queryState) {
   await new Promise((resolve) => setTimeout(resolve, 200));
 
   return { rows: pagedRows, totalCount: sortedRows.length };
+}
+
+/** Unique string values for a column (full dataset, for filter UI). */
+export function getDistinctColumnValues(field) {
+  const seen = new Set();
+  for (const row of dataStore) {
+    const v = row[field];
+    if (v !== undefined && v !== null) seen.add(String(v));
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+export async function fetchDistinctColumnValues(field) {
+  await new Promise((r) => setTimeout(r, 0));
+  return getDistinctColumnValues(field);
 }
 
 export async function updateRow(id, updates) {

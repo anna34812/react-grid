@@ -4,21 +4,13 @@ import { DEFAULT_QUERY_STATE } from "../utils/query";
 export const useGridQuery = (initialState = {}) => {
   const [queryState, setQueryState] = useState({ ...DEFAULT_QUERY_STATE, ...initialState });
 
-  const totalPages = useMemo(() => {
-    return queryState.pageSize > 0 ? Math.ceil((queryState.totalCount ?? 0) / queryState.pageSize) : 0;
-  }, [queryState.pageSize, queryState.totalCount]);
+  const totalPages = useMemo(() => (queryState.pageSize > 0 ? Math.ceil((queryState.totalCount ?? 0) / queryState.pageSize) : 0), [queryState.pageSize, queryState.totalCount]);
 
-  const setPage = useCallback((page) => {
-    setQueryState((previous) => ({ ...previous, page }));
-  }, []);
+  const setPage = useCallback((page) => setQueryState((previous) => ({ ...previous, page })), []);
 
-  const setPageSize = useCallback((pageSize) => {
-    setQueryState((previous) => ({ ...previous, pageSize, page: 1 }));
-  }, []);
+  const setPageSize = useCallback((pageSize) => setQueryState((previous) => ({ ...previous, pageSize, page: 1 })), []);
 
-  const setSort = useCallback((sortField, sortDirection) => {
-    setQueryState((previous) => ({ ...previous, sortField, sortDirection, page: 1 }));
-  }, []);
+  const setSort = useCallback((sortField, sortDirection) => setQueryState((previous) => ({ ...previous, sortField, sortDirection, page: 1 })), []);
 
   const setFilter = useCallback((field, value, operator = "contains") => {
     setQueryState((previous) => {
@@ -39,9 +31,7 @@ export const useGridQuery = (initialState = {}) => {
     });
   }, []);
 
-  const setTotalCount = useCallback((totalCount) => {
-    setQueryState((previous) => ({ ...previous, totalCount }));
-  }, []);
+  const setTotalCount = useCallback((totalCount) => setQueryState((previous) => ({ ...previous, totalCount })), []);
 
   return { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount };
 };

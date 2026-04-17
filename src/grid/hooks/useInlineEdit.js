@@ -58,14 +58,5 @@ export const useInlineEdit = (setRows) => {
     }
   };
 
-  return {
-    editingCell,
-    draftValue,
-    savingCell,
-    editError,
-    setDraftValue,
-    startEdit,
-    cancelEdit,
-    saveEdit,
-  };
+  return { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit };
 };

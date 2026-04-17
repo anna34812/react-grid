@@ -1,13 +1,11 @@
 export const getColumnMinWidth = (column) => {
   if (typeof column.width === "number") return column.width;
   if (typeof column.minWidth === "number") return column.minWidth;
-
   return 140;
 };
 
 export const getEffectivePin = (column, pinnedOverrides) => {
   if (Object.prototype.hasOwnProperty.call(pinnedOverrides, column.field)) return pinnedOverrides[column.field];
-
   return column.pinned ?? null;
 };
 

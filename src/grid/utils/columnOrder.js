@@ -6,13 +6,9 @@ export const mergeColumnOrder = (prevOrder, columns) => {
   const fields = columns.map((c) => c.field);
   const fieldSet = new Set(fields);
   let base = (prevOrder ?? []).filter((f) => fieldSet.has(f));
-  if (base.length === 0) {
-    base = [...fields];
-  } else {
-    for (const f of fields) {
-      if (!base.includes(f)) base.push(f);
-    }
-  }
+  if (base.length === 0) base = [...fields];
+  else for (const f of fields) if (!base.includes(f)) base.push(f);
+
   return base;
 };
 

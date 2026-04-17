@@ -2,11 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
-import { patchRow } from "../api/gridApi";
+import { fetchDistinctColumnValues, patchRow } from "../api/gridApi";
 import { mergeColumnOrder, reorderFields } from "../utils/columnOrder";
 import { getColumnMinWidth, getColumnSections, getEffectivePin } from "../utils/columnPinning";
 import { reorderRowsById } from "../utils/rowOrder";
+import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
 import { GridPagination } from "./GridPagination";
+import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 
 const nextSortDirection = (currentField, currentDirection, field) => {
   if (currentField !== field) return "asc";
@@ -35,6 +37,9 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
   const [filterDraft, setFilterDraft] = useState({});
+  const [filterPopoverField, setFilterPopoverField] = useState(null);
+  const [distinctByField, setDistinctByField] = useState({});
+  const filterFunnelRefs = useRef({});
   const [pinnedOverrides, setPinnedOverrides] = useState({});
   const isControlledColumnOrder = columnOrderProp !== undefined;
   const [internalColumnOrder, setInternalColumnOrder] = useState(() => mergeColumnOrder(undefined, columns));
@@ -306,10 +311,71 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   useEffect(() => {
     if (!enableFiltering) return;
-    const debounceId = setTimeout(() => Object.entries(filterDraft).forEach(([field, filter]) => setFilter(field, filter.value, filter.operator)), 300);
+    const debounceId = setTimeout(() => {
+      Object.entries(filterDraft).forEach(([field, draft]) => {
+        const column = columns.find((c) => c.field === field);
+        const op = draft.operator ?? column?.filterOperator ?? "contains";
+
+        if (draft.inValues !== undefined && Array.isArray(draft.inValues)) {
+          if (draft.inValues.length === 0) {
+            setFilter(field, [], "in");
+            return;
+          }
+          const distinct = distinctByField[field];
+          if (distinct && distinct.length > 0) {
+            const allSelected = draft.inValues.length === distinct.length && distinct.every((v) => draft.inValues.includes(v));
+            if (allSelected) {
+              const q = draft.quick ?? draft.value ?? "";
+              setFilter(field, q, op);
+              return;
+            }
+          }
+          setFilter(field, draft.inValues, "in");
+          return;
+        }
+
+        const quick = draft.quick ?? draft.value ?? "";
+        setFilter(field, quick, op);
+      });
+    }, 300);
 
     return () => clearTimeout(debounceId);
-  }, [enableFiltering, filterDraft, setFilter]);
+  }, [enableFiltering, filterDraft, setFilter, columns, distinctByField]);
+
+  const closeFilterPopover = useCallback(() => setFilterPopoverField(null), []);
+
+  const handlePopoverSelectionChange = useCallback((field, nextSelected) => {
+    setFilterDraft((previous) => {
+      const cur = previous[field] ?? { quick: "", operator: "contains" };
+      return { ...previous, [field]: { ...cur, inValues: nextSelected } };
+    });
+  }, []);
+
+  const toggleColumnFilterPopover = useCallback(
+    async (field) => {
+      if (filterPopoverField === field) {
+        setFilterPopoverField(null);
+        return;
+      }
+      const vals = await fetchDistinctColumnValues(field);
+      setDistinctByField((p) => ({ ...p, [field]: vals }));
+      setFilterDraft((prev) => {
+        const cur = prev[field] ?? {};
+        const quick = cur.quick ?? cur.value ?? "";
+        const op = cur.operator ?? columns.find((c) => c.field === field)?.filterOperator ?? "contains";
+        const applied = queryState.filters[field];
+        let inValues;
+        if (applied?.operator === "in" && Array.isArray(applied.value)) {
+          inValues = applied.value.map(String);
+        } else {
+          inValues = [...vals];
+        }
+        return { ...prev, [field]: { quick, operator: op, inValues } };
+      });
+      setFilterPopoverField(field);
+    },
+    [filterPopoverField, columns, queryState.filters],
+  );
 
   const pageFrom = (queryState.page - 1) * queryState.pageSize + 1;
   const pageTo = Math.min(queryState.page * queryState.pageSize, queryState.totalCount || 0);
@@ -486,6 +552,51 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   const columnStyle = (column) => ({ minWidth: getColumnMinWidth(column) });
 
+  /** When a subset "in" filter is active, show count + value list (width-fitted) and funnel badge. */
+  const getSetFilterSummary = (field) => {
+    const distinct = distinctByField[field];
+    const draft = filterDraft[field];
+    const applied = queryState.filters[field];
+
+    let values = null;
+    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) {
+      values = draft.inValues.map(String);
+    } else if (applied?.operator === "in" && Array.isArray(applied.value) && applied.value.length > 0) {
+      values = applied.value.map(String);
+    }
+
+    if (!values || values.length === 0) return { isActive: false };
+
+    if (distinct && distinct.length > 0) {
+      const allSelected = values.length === distinct.length && distinct.every((v) => values.includes(String(v)));
+      if (allSelected) return { isActive: false };
+    }
+
+    const sorted = [...values].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return { isActive: true, count: values.length, values: sorted };
+  };
+
+  const renderColumnDragHandle = (column) => {
+    if (!enableColumnReorder || column.movable === true) return null;
+
+    return (
+      <button
+        type='button'
+        className='column-drag-handle'
+        data-column-drag-handle
+        aria-label={`Move column ${column.label}`}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData("application/x-data-grid-field", column.field);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => setDragOverField(null)}
+      >
+        ⠿
+      </button>
+    );
+  };
+
   const renderSectionTable = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
 
@@ -547,23 +658,21 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                             }
                           : undefined
                       }
-                      onDragLeave={
-                        enableColumnReorder
-                          ? (e) => {
-                              if (!e.currentTarget.contains(e.relatedTarget)) setDragOverField(null);
-                            }
-                          : undefined
-                      }
+                      onDragLeave={enableColumnReorder ? (e) => !e.currentTarget.contains(e.relatedTarget) && setDragOverField(null) : undefined}
                       onDropCapture={enableColumnReorder ? (e) => handleColumnDrop(e, column.field) : undefined}
                     >
                       {enableFiltering ? (
                         <div className='header-stack'>
-                          <div className='header-cell'>
+                          <div className='header-cell header-cell--title-row'>
+                            {renderColumnDragHandle(column)}
                             <button type='button' className='header-button' onClick={() => handleSort(column.field)}>
                               {column.label}
                               {direction === "asc" && " \u2191"}
                               {direction === "desc" && " \u2193"}
                             </button>
+                            {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
+                              ⋮
+                            </button> */}
                             <div className='pin-actions' role='group' aria-label={`${column.label} pinning`}>
                               <button type='button' className={`pin-button${pin === "left" ? " active" : ""}`} aria-pressed={pin === "left"} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === "left" ? null : "left")}>
                                 L
@@ -575,27 +684,79 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                           </div>
                           <div className='header-filter'>
                             {column.filterable ? (
-                              <input
-                                className='header-filter-input'
-                                placeholder={`Filter ${column.label}`}
-                                value={filterDraft[column.field]?.value ?? ""}
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  setFilterDraft((previous) => ({ ...previous, [column.field]: { value, operator: column.filterOperator || "contains" } }));
-                                }}
-                              />
+                              (() => {
+                                const setSummary = getSetFilterSummary(column.field);
+                                const quickValue = filterDraft[column.field]?.quick ?? filterDraft[column.field]?.value ?? "";
+
+                                return (
+                                  <div className={`header-filter-inline${setSummary.isActive ? " header-filter-inline--set-active" : ""}`}>
+                                    {setSummary.isActive ? (
+                                      <SetFilterSummaryReadonlyInput
+                                        count={setSummary.count}
+                                        values={setSummary.values}
+                                        columnLabel={column.label}
+                                        className={`header-filter-input header-filter-input--set-active`}
+                                        placeholder={`Filter ${column.label}`}
+                                        onClick={() => void toggleColumnFilterPopover(column.field)}
+                                      />
+                                    ) : (
+                                      <input
+                                        className='header-filter-input'
+                                        placeholder={`Filter ${column.label}`}
+                                        aria-label={`Filter ${column.label}`}
+                                        value={quickValue}
+                                        onChange={(event) => {
+                                          const value = event.target.value;
+                                          const operator = column.filterOperator || "contains";
+                                          setFilterDraft((previous) => ({
+                                            ...previous,
+                                            [column.field]: { quick: value, operator, inValues: undefined },
+                                          }));
+                                        }}
+                                      />
+                                    )}
+                                    <button
+                                      type='button'
+                                      ref={(el) => {
+                                        if (el) filterFunnelRefs.current[column.field] = el;
+                                        else delete filterFunnelRefs.current[column.field];
+                                      }}
+                                      className={[
+                                        "header-filter-funnel",
+                                        filterPopoverField === column.field ? "header-filter-funnel--open" : "",
+                                        setSummary.isActive ? "header-filter-funnel--active" : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                      aria-label={`Filter options for ${column.label}`}
+                                      aria-expanded={filterPopoverField === column.field}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void toggleColumnFilterPopover(column.field);
+                                      }}
+                                    >
+                                      <FilterFunnelIcon />
+                                      {setSummary.isActive ? <span className='header-filter-funnel-badge' aria-hidden /> : null}
+                                    </button>
+                                  </div>
+                                );
+                              })()
                             ) : (
                               <span className='header-filter-spacer' aria-hidden />
                             )}
                           </div>
                         </div>
                       ) : (
-                        <div className='header-cell'>
+                        <div className='header-cell header-cell--title-row'>
+                          {renderColumnDragHandle(column)}
                           <button type='button' className='header-button' onClick={() => handleSort(column.field)}>
                             {column.label}
                             {direction === "asc" && " \u2191"}
                             {direction === "desc" && " \u2193"}
                           </button>
+                          {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
+                            ⋮
+                          </button> */}
                           <div className='pin-actions' role='group' aria-label={`${column.label} pinning`}>
                             <button type='button' className={`pin-button${pin === "left" ? " active" : ""}`} aria-pressed={pin === "left"} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === "left" ? null : "left")}>
                               L
@@ -632,13 +793,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                           }
                         : undefined
                     }
-                    onDragLeave={
-                      enableRowDrag
-                        ? (e) => {
-                            if (!e.currentTarget.contains(e.relatedTarget)) setDragOverRowId(null);
-                          }
-                        : undefined
-                    }
+                    onDragLeave={enableRowDrag ? (e) => !e.currentTarget.contains(e.relatedTarget) && setDragOverRowId(null) : undefined}
                     onDropCapture={enableRowDrag ? (e) => handleRowDrop(e, row.id) : undefined}
                   >
                     {showLeadingRowDrag ? (
@@ -701,6 +856,18 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
       </div>
 
       <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} hasRows={hasRows} onPageChange={setPage} onPageSizeChange={setPageSize} />
+
+      {filterPopoverField ? (
+        <ColumnFilterPopover
+          isOpen
+          onClose={closeFilterPopover}
+          anchorEl={filterFunnelRefs.current[filterPopoverField]}
+          label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField}
+          distinctValues={distinctByField[filterPopoverField] ?? []}
+          selectedValues={filterDraft[filterPopoverField]?.inValues ?? []}
+          onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)}
+        />
+      ) : null}
     </div>
   );
 };

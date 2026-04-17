@@ -1,4 +1,4 @@
-import { fetchRows, updateRow } from '../mock/server'
+import { fetchDistinctColumnValues, fetchRows, updateRow } from '../mock/server'
 import { buildQueryParams } from '../utils/query'
 
 export async function getRows(queryState) {
@@ -10,3 +10,5 @@ export async function getRows(queryState) {
 export async function patchRow(id, updates) {
   return updateRow(id, updates)
 }
+
+export { fetchDistinctColumnValues }
