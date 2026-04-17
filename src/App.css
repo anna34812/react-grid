@@ -83,7 +83,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #fff;
+  background: #f8f9fa;
 }
 
 .tree-data-grid-header-row,
@@ -255,7 +255,8 @@
 .grid-split-root--split .grid-pane--left {
   flex: 0 1 auto;
   max-width: min(55%, 520px);
-  border-right: 3px solid #94a3b8;
+  border-right: 1px solid #d1d5db;
+  box-shadow: 4px 0 10px -4px rgba(15, 23, 42, 0.12);
 }
 
 .grid-split-root--split .grid-pane--center {
@@ -266,7 +267,8 @@
 .grid-split-root--split .grid-pane--right {
   flex: 0 1 auto;
   max-width: min(55%, 520px);
-  border-left: 3px solid #94a3b8;
+  border-left: 1px solid #d1d5db;
+  box-shadow: -4px 0 10px -4px rgba(15, 23, 42, 0.12);
 }
 
 .grid-split-root:not(.grid-split-root--split) .grid-pane--center {
@@ -297,7 +299,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #fff;
+  background: #f8f9fa;
 }
 
 .data-grid-header-row,
@@ -314,9 +316,15 @@
 .data-grid-header-cell,
 .data-grid-cell {
   border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #f3f4f6;
   text-align: left;
   padding: 8px;
   min-width: 0;
+}
+
+.data-grid-header-row .data-grid-header-cell:last-child,
+.data-grid-body .data-grid-row .data-grid-cell:last-child {
+  border-right: none;
 }
 
 .data-grid-body .data-grid-row {
@@ -343,7 +351,10 @@
   justify-content: center;
 }
 
-.grid-select-header,
+.grid-select-header {
+  background: #f8f9fa;
+}
+
 .grid-select-cell {
   background: #fafafa;
 }
