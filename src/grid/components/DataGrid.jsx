@@ -21,11 +21,31 @@ import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
 /** Re-export for apps that imported `DEFAULT_ROW_SELECTION` from `DataGrid`. */
 export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
 
-/** Column defs may set `resizable: false` to hide resize grip and double-click auto-fit for that column. */
-export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true }) => {
+/**
+ * Column defs may set `resizable: false` to hide resize grip and double-click auto-fit for that column.
+ *
+ * Pagination: `paginationMode` controls the footer and how paging works:
+ * - `server` — send `page` / `pageSize` to the API (default).
+ * - `client` — fetch the full filtered/sorted result set and slice pages in the browser.
+ * - `none` — no pagination UI; load and show all rows at once.
+ */
+export const DataGrid = ({
+  columns,
+  columnOrder: columnOrderProp,
+  onColumnOrderChange,
+  enableColumnReorder = false,
+  enableRowDrag = false,
+  onRowOrderChange,
+  rowSelection: rowSelectionProp,
+  onSelectionChange,
+  onEditedRowsChange,
+  enableFiltering = true,
+  enableColumnResize = true,
+  paginationMode = "server",
+}) => {
   const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
   const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize });
-  const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
+  const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount, { paginationMode });
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
   const [dragOverRowId, setDragOverRowId] = useState(null);
   const editedRowsRef = useRef(new Map());
@@ -545,7 +565,9 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
         </div>
       </div>
 
-      <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      {paginationMode !== "none" ? (
+        <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      ) : null}
 
       {filterPopoverField ? (
         <ColumnFilterPopover

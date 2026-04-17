@@ -19,7 +19,7 @@ function App() {
 
   const columns = useMemo(
     () => [
-      { field: "id", label: "ID", editable: false, filterable: false, pinned: "left", minWidth: 72 },
+      { field: "id", label: "ID", editable: false, filterable: false, pinned: "left", minWidth: 100 },
       { field: "name", label: "Name", editable: true, required: true, filterable: true, filterOperator: "contains", minWidth: 160, movable: true },
       {
         field: "email",
@@ -106,7 +106,16 @@ function App() {
         </label>
       </p>
 
-      <DataGrid columns={columns} enableColumnReorder enableRowDrag rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
+      <DataGrid
+        paginationMode='none' // default: server, client, none
+        columns={columns}
+        enableColumnReorder
+        enableRowDrag
+        rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: "multi", checkboxes: true, enableClickSelection: false }}
+        onSelectionChange={onSelectionChange}
+        onEditedRowsChange={onEditedRowsChange}
+        enableFiltering={enableFiltering}
+      />
 
       <h2 style={{ marginTop: "2rem" }}>Tree data (file explorer)</h2>
       <p>

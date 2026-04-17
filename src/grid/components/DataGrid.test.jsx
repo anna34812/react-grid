@@ -21,6 +21,23 @@ describe("DataGrid", () => {
     expect(await screen.findByText("User 21")).toBeInTheDocument();
   });
 
+  it("hides pagination and loads all rows when paginationMode is none", async () => {
+    render(<DataGrid columns={columns} paginationMode='none' />);
+    expect(await screen.findByText("User 1")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Table pagination" })).not.toBeInTheDocument();
+    expect(screen.getByText("User 21")).toBeInTheDocument();
+  });
+
+  it("pages on the client when paginationMode is client", async () => {
+    render(<DataGrid columns={columns} paginationMode='client' />);
+    expect(await screen.findByText("User 1")).toBeInTheDocument();
+    expect(screen.queryByText("User 21")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("User 21")).toBeInTheDocument();
+    expect(screen.queryByText("User 1")).not.toBeInTheDocument();
+  });
+
   it("sorts by name column", async () => {
     const { container } = render(<DataGrid columns={columns} />);
     await screen.findByText("User 1");
