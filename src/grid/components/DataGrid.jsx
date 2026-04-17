@@ -688,7 +688,6 @@ export function DataGrid({
 
   return (
     <div className="grid-container">
-      {loading && <p className="status">Loading rows...</p>}
       {error && <p className="status error">{error}</p>}
       {editError && <p className="status error">{editError}</p>}
       {!loading && !hasRows && <p className="status">No rows found.</p>}
@@ -696,6 +695,18 @@ export function DataGrid({
       <div
         className={`grid-split-root${hasSplit ? " grid-split-root--split" : ""}`}
       >
+        {loading ? (
+          <div
+            className="grid-loading-overlay"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="grid-loading-chip">
+              <span className="grid-loading-spinner" aria-hidden />
+              <span>Loading...</span>
+            </div>
+          </div>
+        ) : null}
         <div className="grid-split-row">
           {renderSectionTable(leftColumns, "left")}
           {renderSectionTable(centerColumns, "center")}

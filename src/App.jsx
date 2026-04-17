@@ -59,7 +59,7 @@ function App() {
       editable: true,
       filterable: true,
       filterOperator: "gte",
-      pinned: "right",
+      // pinned: "right",
       minWidth: 96,
     },
   ];
