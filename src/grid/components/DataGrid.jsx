@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
+import { patchRow } from "../api/gridApi";
 import {
   getColumnMinWidth,
   getColumnSections,
@@ -87,6 +95,26 @@ export function DataGrid({
   const [pinnedOverrides, setPinnedOverrides] = useState({});
   const editableClickSelectionTimerRef = useRef(null);
   const editedRowsRef = useRef(new Map());
+  const [customSavingCell, setCustomSavingCell] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!editingCell) {
+      return;
+    }
+    const host = document.querySelector("[data-edit-host]");
+    if (!host) {
+      return;
+    }
+    const focusable = host.querySelector(
+      "input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [contenteditable='true'], [tabindex]:not([tabindex='-1'])",
+    );
+    if (focusable instanceof HTMLElement) {
+      focusable.focus({ preventScroll: true });
+      if (focusable instanceof HTMLInputElement) {
+        focusable.select();
+      }
+    }
+  }, [editingCell]);
 
   const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
   const showSelectColumn = selectionEnabled && rs.checkboxes;
@@ -365,11 +393,57 @@ export function DataGrid({
     [draftValue, saveEdit, emitEditedRowsChange],
   );
 
+  const updateCustomCellValue = useCallback(
+    async ({ row, column, nextValue }) => {
+      const normalizedValue =
+        column.type === "number" ? Number(nextValue) : nextValue;
+      if (Object.is(row[column.field], normalizedValue)) {
+        return true;
+      }
+      const previousRows = [];
+      setCustomSavingCell({ rowId: row.id, field: column.field });
+      setRows((rowsSnapshot) => {
+        previousRows.push(...rowsSnapshot);
+        return rowsSnapshot.map((currentRow) =>
+          currentRow.id === row.id
+            ? { ...currentRow, [column.field]: normalizedValue }
+            : currentRow,
+        );
+      });
+
+      try {
+        await patchRow(row.id, { [column.field]: normalizedValue });
+        emitEditedRowsChange({
+          rowId: row.id,
+          field: column.field,
+          value: normalizedValue,
+          previousRow: row,
+        });
+        return true;
+      } catch (_error) {
+        setRows(previousRows);
+        return false;
+      } finally {
+        setCustomSavingCell(null);
+      }
+    },
+    [setRows, emitEditedRowsChange],
+  );
+
   const renderCell = (row, column) => {
     const isEditing =
       editingCell?.rowId === row.id && editingCell?.field === column.field;
     const isSaving =
-      savingCell?.rowId === row.id && savingCell?.field === column.field;
+      (savingCell?.rowId === row.id && savingCell?.field === column.field) ||
+      (customSavingCell?.rowId === row.id &&
+        customSavingCell?.field === column.field);
+    const baseRenderParams = {
+      row,
+      column,
+      value: row[column.field],
+      isEditing,
+      isSaving,
+    };
 
     if (isEditing) {
       const stopEditHostBubble = (event) => {
@@ -388,14 +462,53 @@ export function DataGrid({
         void handleSaveEdit({ row, column });
         return true;
       };
-      const handleEditInputBlur = (event) => {
-        const editHost = event.currentTarget.closest("[data-edit-host]");
+      const handleEditHostBlur = (event) => {
+        const editHost = event.currentTarget;
         const nextFocused = event.relatedTarget;
         if (nextFocused && editHost?.contains(nextFocused)) {
           return;
         }
         commitEditIfChanged();
       };
+      const handleEditHostKeyDown = (event) => {
+        if (event.key === "Enter") {
+          if (event.target.closest("textarea")) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          commitEditIfChanged();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          cancelEdit();
+        }
+      };
+
+      if (typeof column.renderEditCell === "function") {
+        return (
+          <div
+            className="edit-cell"
+            data-no-row-select
+            data-edit-host
+            onPointerDown={stopEditHostBubble}
+            onPointerUp={stopEditHostBubble}
+            onClick={stopEditHostBubble}
+            onBlur={handleEditHostBlur}
+            onKeyDown={handleEditHostKeyDown}
+          >
+            {column.renderEditCell({
+              ...baseRenderParams,
+              value: draftValue,
+              setValue: setDraftValue,
+              save: () => handleSaveEdit({ row, column }),
+              cancel: cancelEdit,
+            })}
+          </div>
+        );
+      }
+
       return (
         <div
           className="edit-cell"
@@ -404,6 +517,8 @@ export function DataGrid({
           onPointerDown={stopEditHostBubble}
           onPointerUp={stopEditHostBubble}
           onClick={stopEditHostBubble}
+          onBlur={handleEditHostBlur}
+          onKeyDown={handleEditHostKeyDown}
         >
           <input
             value={draftValue}
@@ -413,19 +528,6 @@ export function DataGrid({
             }}
             onClick={stopEditHostBubble}
             onPointerDown={stopEditHostBubble}
-            onBlur={handleEditInputBlur}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                event.stopPropagation();
-                commitEditIfChanged();
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                event.stopPropagation();
-                cancelEdit();
-              }
-            }}
           />
           {/* <div className="edit-actions">
             <button
@@ -453,6 +555,15 @@ export function DataGrid({
           </div> */}
         </div>
       );
+    }
+
+    if (typeof column.renderCell === "function") {
+      return column.renderCell({
+        ...baseRenderParams,
+        startEdit: () => startEdit(row.id, column.field, row[column.field]),
+        updateValue: (nextValue) =>
+          updateCustomCellValue({ row, column, nextValue }),
+      });
     }
 
     if (!column.editable) {

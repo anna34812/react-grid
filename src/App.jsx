@@ -20,12 +20,12 @@ function App() {
     });
   }, []);
 
-  const onEditedRowsChange = useCallback((detail) => {
-    console.log("onEditedRowsChange", detail);
+  const onEditedRowsChange = useCallback(({ currentEditedRow, editedRows }) => {
+    console.log("onEditedRowsChange", currentEditedRow, editedRows);
 
     setEditedState({
-      currentEditedRow: detail.currentEditedRow,
-      editedRows: detail.editedRows,
+      currentEditedRow: currentEditedRow,
+      editedRows: editedRows,
     });
   }, []);
 
@@ -55,15 +55,40 @@ function App() {
       filterable: true,
       filterOperator: "contains",
       minWidth: 220,
+      renderEditCell: ({ value, setValue, save, cancel, isSaving }) => (
+        <>
+          <input
+            value={value}
+            disabled={isSaving}
+            onChange={(e) => setValue(e.target.value)}
+          />
+          {/* <button type="button" onClick={save} disabled={isSaving}>
+            Save
+          </button>
+          <button type="button" onClick={cancel} disabled={isSaving}>
+            Cancel
+          </button> */}
+        </>
+      ),
     },
     {
       field: "status",
       label: "Status",
       editable: true,
       required: true,
-      filterable: true,
-      filterOperator: "eq",
-      minWidth: 120,
+      renderCell: ({ value, row, updateValue, isSaving }) => (
+        <select
+          value={value}
+          disabled={isSaving}
+          aria-label={`status-${row.id}`}
+          onChange={(event) => {
+            void updateValue(event.target.value);
+          }}
+        >
+          <option value="active">active</option>
+          <option value="disabled">disabled</option>
+        </select>
+      ),
     },
     {
       field: "score",
@@ -74,6 +99,17 @@ function App() {
       filterOperator: "gte",
       // pinned: "right",
       minWidth: 96,
+    },
+    {
+      field: "action",
+      label: "Action",
+      editable: false,
+      filterable: false,
+      renderCell: ({ row }) => (
+        <button type="button" onClick={() => console.log(row)}>
+          Action
+        </button>
+      ),
     },
   ];
 
