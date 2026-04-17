@@ -25,7 +25,7 @@ describe("DataGrid", () => {
     const { container } = render(<DataGrid columns={columns} />);
     await screen.findByText("User 1");
 
-    const nameSortButton = container.querySelector('th[data-field="name"] .header-button');
+    const nameSortButton = container.querySelector('[data-field="name"][role="columnheader"] .header-button');
     await userEvent.click(nameSortButton);
     await userEvent.click(nameSortButton);
 
@@ -213,7 +213,7 @@ describe("DataGrid", () => {
     const { container } = render(<DataGrid columns={pinnedColumns} />);
     await screen.findByText("User 1");
 
-    const headerFields = [...container.querySelectorAll("thead tr:first-child th")].map((cell) => cell.getAttribute("data-field"));
+    const headerFields = [...container.querySelectorAll(".data-grid-header-row [role='columnheader']")].map((cell) => cell.getAttribute("data-field"));
 
     expect(headerFields[0]).toBe("id");
     expect(headerFields[1]).toBe("name");
@@ -250,7 +250,7 @@ describe("DataGrid", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Pin ID right" }));
 
-    const headerFields = [...container.querySelectorAll("thead tr:first-child th")].map((cell) => cell.getAttribute("data-field"));
+    const headerFields = [...container.querySelectorAll(".data-grid-header-row [role='columnheader']")].map((cell) => cell.getAttribute("data-field"));
 
     expect(headerFields.at(-1)).toBe("id");
   });
@@ -318,8 +318,8 @@ describe("DataGrid", () => {
     await screen.findByText("User 1");
     expect(container.querySelector('[data-field="__select__"]')).toBeNull();
 
-    const row1Id = container.querySelector('tbody tr td[data-field="id"] .cell-display');
-    const row2Id = container.querySelector('tbody tr:nth-child(2) td[data-field="id"] .cell-display');
+    const row1Id = container.querySelector('.data-grid-row .data-grid-cell[data-field="id"] .cell-display');
+    const row2Id = container.querySelector('.data-grid-body .data-grid-row:nth-child(2) .data-grid-cell[data-field="id"] .cell-display');
 
     await userEvent.click(row1Id);
     expect(onSelectionChange.mock.calls.at(-1)[0].selectedIds).toEqual([1]);

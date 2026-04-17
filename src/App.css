@@ -252,22 +252,37 @@
   /* scrollbar-gutter: stable; */
 }
 
-.data-grid-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+/* DataGrid: div + CSS Grid (aligned with TreeDataGrid pane pattern) */
+.data-grid {
+  display: flex;
+  flex-direction: column;
+  min-width: max-content;
+  width: 100%;
 }
 
-.data-grid-table th,
-.data-grid-table td {
+.data-grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+.data-grid-header-row,
+.data-grid-row {
+  display: grid;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.data-grid-header-cell,
+.data-grid-cell {
   border-bottom: 1px solid #e5e7eb;
   text-align: left;
   padding: 8px;
-  vertical-align: top;
+  min-width: 0;
 }
 
-.data-grid-table tbody tr {
+.data-grid-body .data-grid-row {
   min-height: 44px;
 }
 
@@ -357,7 +372,7 @@
   background: #e0e7ff;
 }
 
-.data-grid-row--selected td:not(.grid-select-cell) {
+.data-grid-row--selected .data-grid-cell:not(.grid-select-cell) {
   background: #eef2ff;
 }
 

@@ -1,39 +1,26 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGridQuery } from "../hooks/useGridQuery";
 import { useGridData } from "../hooks/useGridData";
 import { useInlineEdit } from "../hooks/useInlineEdit";
-import { fetchDistinctColumnValues, patchRow } from "../api/gridApi";
-import { mergeColumnOrder, reorderFields } from "../utils/columnOrder";
-import { getColumnMinWidth, getColumnSections, getEffectivePin } from "../utils/columnPinning";
+import { patchRow } from "../api/gridApi";
+import { getColumnMinWidth, getEffectivePin } from "../utils/columnPinning";
+import { nextSortDirection } from "../utils/gridSort";
+import { buildGridTemplateColumns } from "../utils/gridTemplateColumns";
 import { computeTreeAggregates, flattenTreeRows, getIdsWithChildren } from "../utils/treeData";
+import { useGridColumnOrder } from "../hooks/useGridColumnOrder";
+import { useGridEditFocus } from "../hooks/useGridEditFocus";
+import { useGridFilters } from "../hooks/useGridFilters";
+import { useGridRowSelection } from "../hooks/useGridRowSelection";
+import { useGridSplitSync } from "../hooks/useGridSplitSync";
 import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
 import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
-import { DEFAULT_ROW_SELECTION } from "./DataGrid";
+
+/** Re-export for convenience; same shape as DataGrid. */
+export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
 
 /** Must match `.tree-row-height-anim--animate` / `--animate-out` duration in App.css */
 const TREE_ROW_ANIM_MS = 420;
 const TREE_ROW_STAGGER_MS = 32;
-
-const nextSortDirection = (currentField, currentDirection, field) => {
-  if (currentField !== field) return "asc";
-  if (currentDirection === "asc") return "desc";
-  if (currentDirection === "desc") return null;
-  return "asc";
-};
-
-const toIdSet = (ids) => {
-  if (ids == null) return new Set();
-  return new Set(Array.isArray(ids) ? ids : [...ids]);
-};
-
-/** Re-export for convenience; same shape as DataGrid. */
-export { DEFAULT_ROW_SELECTION };
-
-const mergeRowSelection = (partial) => {
-  const rs = { ...DEFAULT_ROW_SELECTION, ...(partial ?? {}) };
-  if (rs.mode !== "none" && !rs.checkboxes && !rs.enableClickSelection) rs.enableClickSelection = true;
-  return rs;
-};
 
 /**
  * Tree (hierarchical) data grid: div-based body for reliable row animations; same features as DataGrid tree mode (filters, sort, pin, column reorder, selection, aggregates, expand/collapse). No pagination — the flattened visible tree is shown in full (typical for tree UIs).
@@ -42,20 +29,11 @@ const mergeRowSelection = (partial) => {
  * `animateRows`: each body row uses `0fr → 1fr` on mount (expand) and `1fr → 0fr` before removal (collapse). Set `false` for instant show/hide.
  */
 export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true }) => {
-  const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
   const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: true } });
-  const [filterDraft, setFilterDraft] = useState({});
-  const [filterPopoverField, setFilterPopoverField] = useState(null);
-  const [distinctByField, setDistinctByField] = useState({});
-  const filterFunnelRefs = useRef({});
-  const [pinnedOverrides, setPinnedOverrides] = useState({});
-  const isControlledColumnOrder = columnOrderProp !== undefined;
-  const [internalColumnOrder, setInternalColumnOrder] = useState(() => mergeColumnOrder(undefined, columns));
-  const [dragOverField, setDragOverField] = useState(null);
   const treeParentField = treeDataConfig.parentField ?? "parentId";
   const treeRowIdField = treeDataConfig.rowIdField ?? "id";
   const treeExpandColumnField = treeDataConfig.expandColumnField ?? "name";
@@ -71,35 +49,15 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   pendingCollapseRef.current = pendingCollapseId;
   const collapseTimerRef = useRef(null);
   const treeExpandInitRef = useRef(false);
-  const editableClickSelectionTimerRef = useRef(null);
   const editedRowsRef = useRef(new Map());
   const [customSavingCell, setCustomSavingCell] = useState(null);
 
-  useLayoutEffect(() => {
-    if (!editingCell) return;
-
-    const host = document.querySelector("[data-edit-host]");
-    if (!host) return;
-
-    const focusable = host.querySelector("input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [contenteditable='true'], [tabindex]:not([tabindex='-1'])");
-    if (focusable instanceof HTMLElement) {
-      focusable.focus({ preventScroll: true });
-      if (focusable instanceof HTMLInputElement) focusable.select();
-    }
-  }, [editingCell]);
-
-  useEffect(() => {
-    if (!isControlledColumnOrder) {
-      setInternalColumnOrder((prev) => mergeColumnOrder(prev, columns));
-    }
-  }, [columns, isControlledColumnOrder]);
-
-  const displayOrder = useMemo(() => mergeColumnOrder(isControlledColumnOrder ? columnOrderProp : internalColumnOrder, columns), [isControlledColumnOrder, columnOrderProp, internalColumnOrder, columns]);
-
-  const orderedColumns = useMemo(() => {
-    const byField = Object.fromEntries(columns.map((c) => [c.field, c]));
-    return displayOrder.map((f) => byField[f]).filter(Boolean);
-  }, [columns, displayOrder]);
+  const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({
+    columns,
+    columnOrder: columnOrderProp,
+    onColumnOrderChange,
+    enableColumnReorder,
+  });
 
   useEffect(() => {
     if (!rows.length || treeExpandInitRef.current) return;
@@ -248,289 +206,46 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     [animateRows, isDescendantOf, rows, rowsById],
   );
 
-  const commitColumnOrder = useCallback(
-    (next) => {
-      onColumnOrderChange?.(next);
-      if (!isControlledColumnOrder) setInternalColumnOrder(next);
-    },
-    [onColumnOrderChange, isControlledColumnOrder],
-  );
+  const viewRowIds = useMemo(() => flattenedRows.map((r) => r[treeRowIdField]), [flattenedRows, treeRowIdField]);
 
-  const handleColumnDrop = useCallback(
-    (event, targetField) => {
-      if (!enableColumnReorder) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setDragOverField(null);
+  const {
+    rs,
+    selectedSet,
+    selectionEnabled,
+    showSelectColumn,
+    enableClickSelection,
+    leftColumns,
+    centerColumns,
+    rightColumns,
+    hasSplit,
+    selectionPane,
+    leadingPane,
+    toggleRowSelection,
+    toggleSelectAllInView,
+    allSelectedInView,
+    someSelectedInView,
+    applySelectionForRowClick,
+    handleRowBackgroundClick,
+    editableClickSelectionTimerRef,
+  } = useGridRowSelection({
+    rowSelection: rowSelectionProp,
+    onSelectionChange,
+    orderedColumns,
+    pinnedOverrides,
+    rows,
+    viewRowIds,
+    rowIdField: treeRowIdField,
+  });
 
-      const sourceField = event.dataTransfer.getData("application/x-data-grid-field");
-      if (!sourceField || sourceField === targetField) return;
+  const allSelectedVisible = allSelectedInView;
+  const someSelectedVisible = someSelectedInView;
+  const toggleSelectAllVisible = toggleSelectAllInView;
 
-      const next = reorderFields(displayOrder, sourceField, targetField);
-      commitColumnOrder(next);
-    },
-    [enableColumnReorder, displayOrder, commitColumnOrder],
-  );
+  const { filterDraft, setFilterDraft, filterPopoverField, setFilterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: true });
 
-  const handleColumnHeaderDragStart = useCallback(
-    (event, column) => {
-      if (!enableColumnReorder || column.movable !== true) return;
-      if (event.target.closest("input, select, textarea, .header-filter, .pin-actions")) {
-        event.preventDefault();
-        return;
-      }
-      event.dataTransfer.setData("application/x-data-grid-field", column.field);
-      event.dataTransfer.effectAllowed = "move";
-    },
-    [enableColumnReorder],
-  );
+  useGridEditFocus(editingCell);
 
-  const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
-  const showSelectColumn = selectionEnabled && rs.checkboxes;
-  const enableClickSelection = selectionEnabled && rs.enableClickSelection;
-  const isControlled = rs.selectedIds !== undefined;
-
-  const [internalSelected, setInternalSelected] = useState(() => toIdSet(mergeRowSelection(rowSelectionProp).defaultSelectedIds));
-
-  const { left: leftColumns, center: centerColumns, right: rightColumns } = useMemo(() => getColumnSections(orderedColumns, pinnedOverrides), [orderedColumns, pinnedOverrides]);
-
-  const hasSplit = leftColumns.length > 0 || rightColumns.length > 0;
-
-  const selectedSet = useMemo(() => {
-    if (!selectionEnabled) return new Set();
-    if (isControlled) return toIdSet(rs.selectedIds);
-
-    return internalSelected;
-  }, [selectionEnabled, isControlled, rs.selectedIds, internalSelected]);
-
-  const selectionPane = useMemo(() => {
-    if (!showSelectColumn) return null;
-    if (leftColumns.length > 0) return "left";
-    if (centerColumns.length > 0) return "center";
-    if (rightColumns.length > 0) return "right";
-
-    return null;
-  }, [showSelectColumn, leftColumns.length, centerColumns.length, rightColumns.length]);
-
-  const leadingPane = useMemo(() => {
-    if (leftColumns.length > 0) return "left";
-    if (centerColumns.length > 0) return "center";
-    if (rightColumns.length > 0) return "right";
-
-    return null;
-  }, [leftColumns.length, centerColumns.length, rightColumns.length]);
-
-  const visibleRowIds = useMemo(() => flattenedRows.map((r) => r[treeRowIdField]), [flattenedRows, treeRowIdField]);
-  const gridSplitRowRef = useRef(null);
-
-  useLayoutEffect(() => {
-    if (!hasSplit) return;
-
-    const rootEl = gridSplitRowRef.current;
-    if (!rootEl || typeof ResizeObserver === "undefined") return;
-
-    let rafId = 0;
-    const syncSplitHeights = () => {
-      const headerTrs = [...rootEl.querySelectorAll(".tree-data-grid-header-row[data-tree-sync-header]")];
-      if (headerTrs.length > 1) {
-        headerTrs.forEach((tr) => (tr.style.height = ""));
-
-        const maxHeader = Math.max(0, ...headerTrs.map((tr) => tr.getBoundingClientRect().height));
-        headerTrs.forEach((tr) => (tr.style.height = `${maxHeader}px`));
-      }
-
-      for (let i = 0; i < flattenedRows.length; i += 1) {
-        const trs = [...rootEl.querySelectorAll(`.tree-row-height-anim[data-sync-row-index="${i}"]`)];
-        if (trs.length <= 1) continue;
-        trs.forEach((tr) => (tr.style.height = ""));
-
-        const maxRow = Math.max(0, ...trs.map((tr) => tr.getBoundingClientRect().height));
-        trs.forEach((tr) => (tr.style.height = `${maxRow}px`));
-      }
-    };
-
-    const scheduleSync = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(syncSplitHeights);
-    };
-
-    scheduleSync();
-
-    const ro = new ResizeObserver(scheduleSync);
-    ro.observe(rootEl);
-    rootEl.querySelectorAll(".tree-data-grid").forEach((el) => ro.observe(el));
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      ro.disconnect();
-    };
-  }, [hasSplit, flattenedRows]);
-
-  const allSelectedVisible = visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedSet.has(id));
-  const someSelectedVisible = visibleRowIds.some((id) => selectedSet.has(id)) && !allSelectedVisible;
-
-  const applySelection = useCallback(
-    (nextSet) => {
-      if (!selectionEnabled) return;
-
-      const ids = [...nextSet];
-      const selectedRows = rows.filter((r) => nextSet.has(r.id));
-      if (!isControlled) setInternalSelected(new Set(nextSet));
-      onSelectionChange?.({ selectedIds: ids, selectedRows });
-    },
-    [selectionEnabled, rows, isControlled, onSelectionChange],
-  );
-
-  const toggleRowSelection = useCallback(
-    (rowId) => {
-      if (!selectionEnabled) return;
-
-      const next = new Set(selectedSet);
-      if (rs.mode === "single") {
-        if (next.has(rowId)) next.clear();
-        else {
-          next.clear();
-          next.add(rowId);
-        }
-      } else if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
-      applySelection(next);
-    },
-    [selectionEnabled, rs.mode, selectedSet, applySelection],
-  );
-
-  const toggleSelectAllVisible = useCallback(() => {
-    if (rs.mode !== "multi" || !rs.checkboxes) return;
-
-    const next = new Set(selectedSet);
-    if (allSelectedVisible) visibleRowIds.forEach((id) => next.delete(id));
-    else visibleRowIds.forEach((id) => next.add(id));
-
-    applySelection(next);
-  }, [rs.mode, rs.checkboxes, visibleRowIds, allSelectedVisible, selectedSet, applySelection]);
-
-  const applySelectionForRowClick = useCallback(
-    (event, rowId) => {
-      if (!enableClickSelection) return;
-      const multiClickWithoutCheckbox = rs.mode === "multi" && !rs.checkboxes && enableClickSelection;
-      if (multiClickWithoutCheckbox) {
-        const additive = event.ctrlKey || event.metaKey;
-        if (additive) toggleRowSelection(rowId);
-        else {
-          const next = new Set(selectedSet);
-          if (next.size === 1 && next.has(rowId)) next.clear();
-          else {
-            next.clear();
-            next.add(rowId);
-          }
-          applySelection(next);
-        }
-        return;
-      }
-
-      toggleRowSelection(rowId);
-    },
-    [enableClickSelection, rs.mode, rs.checkboxes, selectedSet, applySelection, toggleRowSelection],
-  );
-
-  const handleRowBackgroundClick = useCallback(
-    (event, rowId) => {
-      if (!enableClickSelection) return;
-      if (event.target.closest("[data-no-row-select]")) return;
-      if (event.target.closest("[data-edit-host]")) return;
-      if (event.target.closest("[data-editable-cell]")) return;
-
-      const btn = event.target.closest("button");
-      if (btn && !btn.disabled) return;
-      if (event.target.closest("input, select, textarea, a, label")) return;
-
-      applySelectionForRowClick(event, rowId);
-    },
-    [enableClickSelection, applySelectionForRowClick],
-  );
-
-  const setPinForField = (field, pin) => setPinnedOverrides((previous) => ({ ...previous, [field]: pin }));
-
-  useEffect(() => {
-    return () => {
-      if (editableClickSelectionTimerRef.current) clearTimeout(editableClickSelectionTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!enableFiltering) {
-      setFilterDraft({});
-      clearFilters();
-    }
-  }, [enableFiltering, clearFilters]);
-
-  useEffect(() => {
-    if (!enableFiltering) return;
-    const debounceId = setTimeout(() => {
-      Object.entries(filterDraft).forEach(([field, draft]) => {
-        const column = columns.find((c) => c.field === field);
-        const op = draft.operator ?? column?.filterOperator ?? "contains";
-
-        if (draft.inValues !== undefined && Array.isArray(draft.inValues)) {
-          if (draft.inValues.length === 0) {
-            setFilter(field, [], "in");
-            return;
-          }
-          const distinct = distinctByField[field];
-          if (distinct && distinct.length > 0) {
-            const allSelected = draft.inValues.length === distinct.length && distinct.every((v) => draft.inValues.includes(v));
-            if (allSelected) {
-              const q = draft.quick ?? draft.value ?? "";
-              setFilter(field, q, op);
-              return;
-            }
-          }
-          setFilter(field, draft.inValues, "in");
-          return;
-        }
-
-        const quick = draft.quick ?? draft.value ?? "";
-        setFilter(field, quick, op);
-      });
-    }, 300);
-
-    return () => clearTimeout(debounceId);
-  }, [enableFiltering, filterDraft, setFilter, columns, distinctByField]);
-
-  const closeFilterPopover = useCallback(() => setFilterPopoverField(null), []);
-
-  const handlePopoverSelectionChange = useCallback((field, nextSelected) => {
-    setFilterDraft((previous) => {
-      const cur = previous[field] ?? { quick: "", operator: "contains" };
-      return { ...previous, [field]: { ...cur, inValues: nextSelected } };
-    });
-  }, []);
-
-  const toggleColumnFilterPopover = useCallback(
-    async (field) => {
-      if (filterPopoverField === field) {
-        setFilterPopoverField(null);
-        return;
-      }
-      const vals = await fetchDistinctColumnValues(field, { treeMode: true });
-      setDistinctByField((p) => ({ ...p, [field]: vals }));
-      setFilterDraft((prev) => {
-        const cur = prev[field] ?? {};
-        const quick = cur.quick ?? cur.value ?? "";
-        const op = cur.operator ?? columns.find((c) => c.field === field)?.filterOperator ?? "contains";
-        const applied = queryState.filters[field];
-        let inValues;
-        if (applied?.operator === "in" && Array.isArray(applied.value)) {
-          inValues = applied.value.map(String);
-        } else {
-          inValues = [...vals];
-        }
-        return { ...prev, [field]: { quick, operator: op, inValues } };
-      });
-      setFilterPopoverField(field);
-    },
-    [filterPopoverField, columns, queryState.filters],
-  );
+  const gridSplitRowRef = useGridSplitSync({ hasSplit, rowCount: flattenedRows.length, variant: "tree" });
 
   const hasRows = flattenedRows.length > 0;
 
@@ -729,51 +444,18 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     return { isActive: true, count: values.length, values: sorted };
   };
 
-  const renderColumnDragHandle = (column) => {
-    if (!enableColumnReorder || column.movable === true) return null;
-
-    return (
-      <button
-        type='button'
-        className='column-drag-handle'
-        data-column-drag-handle
-        aria-label={`Move column ${column.label}`}
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData("application/x-data-grid-field", column.field);
-          e.dataTransfer.effectAllowed = "move";
-        }}
-        onDragEnd={() => setDragOverField(null)}
-      >
-        ⠿
-      </button>
-    );
-  };
-
-  const buildTreeGridTemplateColumns = (sectionColumns, showSelect) => {
-    const parts = [];
-    if (showSelect) parts.push("44px");
-    sectionColumns.forEach((c) => parts.push(`minmax(${getColumnMinWidth(c)}px, 1fr)`));
-    return parts.join(" ");
-  };
-
   const renderSectionGrid = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
-    const colTpl = buildTreeGridTemplateColumns(sectionColumns, showLeadingSelect);
+    const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect });
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
         <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
           <div className='tree-data-grid' role='grid' aria-rowcount={flattenedRows.length} aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}>
             <div className='tree-data-grid-header' role='rowgroup'>
-              <div
-                className='tree-data-grid-header-row'
-                role='row'
-                {...(hasSplit ? { "data-tree-sync-header": "" } : {})}
-                style={{ gridTemplateColumns: colTpl }}
-              >
+              <div className='tree-data-grid-header-row' role='row' {...(hasSplit ? { "data-tree-sync-header": "" } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingSelect ? (
                   <div className='tree-grid-header-cell tree-grid-header-cell--select' role='columnheader' data-field='__select__'>
                     {enableFiltering ? (
@@ -821,7 +503,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                       {enableFiltering ? (
                         <div className='header-stack'>
                           <div className='header-cell header-cell--title-row'>
-                            {renderColumnDragHandle(column)}
                             <button type='button' className='header-button' onClick={() => handleSort(column.field)}>
                               {column.label}
                               {direction === "asc" && " \u2191"}
@@ -892,7 +573,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                         </div>
                       ) : (
                         <div className='header-cell header-cell--title-row'>
-                          {renderColumnDragHandle(column)}
                           <button type='button' className='header-button' onClick={() => handleSort(column.field)}>
                             {column.label}
                             {direction === "asc" && " \u2191"}
