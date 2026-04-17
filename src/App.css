@@ -1,0 +1,202 @@
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  color: #111827;
+}
+
+.grid-container {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.grid-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.grid-split-root {
+  max-width: 100%;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.grid-split-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+
+.grid-split-root:not(.grid-split-root--split) .grid-split-row {
+  display: block;
+}
+
+.grid-pane {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-split-root--split .grid-pane--left {
+  flex: 0 1 auto;
+  max-width: min(55%, 520px);
+  border-right: 3px solid #94a3b8;
+}
+
+.grid-split-root--split .grid-pane--center {
+  flex: 1 1 0;
+  min-width: 120px;
+}
+
+.grid-split-root--split .grid-pane--right {
+  flex: 0 1 auto;
+  max-width: min(55%, 520px);
+  border-left: 3px solid #94a3b8;
+}
+
+.grid-split-root:not(.grid-split-root--split) .grid-pane--center {
+  max-width: 100%;
+}
+
+.grid-pane-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  width: 100%;
+}
+
+/* Any column pinned: each pane always reserves horizontal scroll (ag-Grid–style). */
+.grid-pane-scroll--pinned {
+  overflow-x: scroll;
+  /* scrollbar-gutter: stable; */
+}
+
+.data-grid-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-grid-table th,
+.data-grid-table td {
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  padding: 8px;
+  vertical-align: top;
+}
+
+.data-grid-table tbody tr {
+  min-height: 44px;
+}
+
+.header-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-cell {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.header-filter {
+  min-width: 0;
+}
+
+.header-filter-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.header-filter-spacer {
+  display: block;
+  min-height: 35px;
+}
+
+.pin-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pin-button {
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4b5563;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.pin-button:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.pin-button.active {
+  background: #4338ca;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+.header-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cell-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.edit-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pagination {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.status {
+  margin: 10px 0;
+  color: #374151;
+}
+
+.status.error {
+  color: #b91c1c;
+}
