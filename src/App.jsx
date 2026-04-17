@@ -3,6 +3,7 @@ import { DataGrid, DEFAULT_ROW_SELECTION } from "./grid/components/DataGrid";
 import "./App.css";
 
 function App() {
+  const [enableFiltering, setEnableFiltering] = useState(true);
   const [selection, setSelection] = useState({
     selectedIds: [],
     selectedRows: [],
@@ -69,7 +70,18 @@ function App() {
       <p>
         Row selection: <code>rowSelection</code> (
         <code>DEFAULT_ROW_SELECTION</code> + overrides) and a separate{" "}
-        <code>onSelectionChange</code> prop.
+        <code>onSelectionChange</code> prop. Column filters:{" "}
+        <code>enableFiltering</code>.
+      </p>
+      <p className="app-options">
+        <label>
+          <input
+            type="checkbox"
+            checked={enableFiltering}
+            onChange={(e) => setEnableFiltering(e.target.checked)}
+          />{" "}
+          Show column filters
+        </label>
       </p>
       <DataGrid
         columns={columns}
@@ -80,6 +92,7 @@ function App() {
           enableClickSelection: true,
         }}
         onSelectionChange={onSelectionChange}
+        enableFiltering={enableFiltering}
       />
       <p className="selection-summary">
         Selected:{" "}

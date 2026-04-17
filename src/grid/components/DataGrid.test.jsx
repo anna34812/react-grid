@@ -73,6 +73,12 @@ describe('DataGrid', () => {
     })
   })
 
+  it('hides filter inputs when enableFiltering is false', async () => {
+    render(<DataGrid columns={columns} enableFiltering={false} />)
+    await screen.findByText('User 1')
+    expect(screen.queryByPlaceholderText('Filter Status')).not.toBeInTheDocument()
+  })
+
   it('moves left-pinned columns ahead of earlier unpinned columns', async () => {
     const pinnedColumns = [
       {

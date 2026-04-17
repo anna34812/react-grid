@@ -52,6 +52,7 @@ export function DataGrid({
   columns,
   rowSelection: rowSelectionProp,
   onSelectionChange,
+  enableFiltering = true,
 }) {
   const rs = useMemo(
     () => mergeRowSelection(rowSelectionProp),
@@ -64,6 +65,7 @@ export function DataGrid({
     setPageSize,
     setSort,
     setFilter,
+    clearFilters,
     setTotalCount,
   } = useGridQuery();
   const { rows, loading, error, setRows } = useGridData(
@@ -271,6 +273,16 @@ export function DataGrid({
   };
 
   useEffect(() => {
+    if (!enableFiltering) {
+      setFilterDraft({});
+      clearFilters();
+    }
+  }, [enableFiltering, clearFilters]);
+
+  useEffect(() => {
+    if (!enableFiltering) {
+      return;
+    }
     const debounceId = setTimeout(() => {
       Object.entries(filterDraft).forEach(([field, filter]) => {
         setFilter(field, filter.value, filter.operator);
@@ -280,7 +292,7 @@ export function DataGrid({
     return () => {
       clearTimeout(debounceId);
     };
-  }, [filterDraft, setFilter]);
+  }, [enableFiltering, filterDraft, setFilter]);
 
   const pageFrom = (queryState.page - 1) * queryState.pageSize + 1;
   const pageTo = Math.min(
@@ -439,7 +451,28 @@ export function DataGrid({
                     style={{ width: 44, minWidth: 44 }}
                     data-field="__select__"
                   >
-                    <div className="header-stack">
+                    {enableFiltering ? (
+                      <div className="header-stack">
+                        <div className="header-cell header-cell--select">
+                          {rs.mode === "multi" ? (
+                            <input
+                              type="checkbox"
+                              aria-label="Select all rows on this page"
+                              checked={allSelectedOnPage}
+                              ref={(el) => {
+                                if (el) {
+                                  el.indeterminate = someSelectedOnPage;
+                                }
+                              }}
+                              onChange={toggleSelectAllPage}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="header-filter">
+                          <span className="header-filter-spacer" aria-hidden />
+                        </div>
+                      </div>
+                    ) : (
                       <div className="header-cell header-cell--select">
                         {rs.mode === "multi" ? (
                           <input
@@ -455,10 +488,7 @@ export function DataGrid({
                           />
                         ) : null}
                       </div>
-                      <div className="header-filter">
-                        <span className="header-filter-spacer" aria-hidden />
-                      </div>
-                    </div>
+                    )}
                   </th>
                 ) : null}
                 {sectionColumns.map((column) => {
@@ -472,7 +502,82 @@ export function DataGrid({
                       data-field={column.field}
                       data-pinned={pin ?? undefined}
                     >
-                      <div className="header-stack">
+                      {enableFiltering ? (
+                        <div className="header-stack">
+                          <div className="header-cell">
+                            <button
+                              type="button"
+                              className="header-button"
+                              onClick={() => {
+                                handleSort(column.field);
+                              }}
+                            >
+                              {column.label}
+                              {direction === "asc" && " \u2191"}
+                              {direction === "desc" && " \u2193"}
+                            </button>
+                            <div
+                              className="pin-actions"
+                              role="group"
+                              aria-label={`${column.label} pinning`}
+                            >
+                              <button
+                                type="button"
+                                className={`pin-button${pin === "left" ? " active" : ""}`}
+                                aria-pressed={pin === "left"}
+                                aria-label={`Pin ${column.label} left`}
+                                onClick={() => {
+                                  setPinForField(
+                                    column.field,
+                                    pin === "left" ? null : "left",
+                                  );
+                                }}
+                              >
+                                L
+                              </button>
+                              <button
+                                type="button"
+                                className={`pin-button${pin === "right" ? " active" : ""}`}
+                                aria-pressed={pin === "right"}
+                                aria-label={`Pin ${column.label} right`}
+                                onClick={() => {
+                                  setPinForField(
+                                    column.field,
+                                    pin === "right" ? null : "right",
+                                  );
+                                }}
+                              >
+                                R
+                              </button>
+                            </div>
+                          </div>
+                          <div className="header-filter">
+                            {column.filterable ? (
+                              <input
+                                className="header-filter-input"
+                                placeholder={`Filter ${column.label}`}
+                                value={filterDraft[column.field]?.value ?? ""}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  setFilterDraft((previous) => ({
+                                    ...previous,
+                                    [column.field]: {
+                                      value,
+                                      operator:
+                                        column.filterOperator || "contains",
+                                    },
+                                  }));
+                                }}
+                              />
+                            ) : (
+                              <span
+                                className="header-filter-spacer"
+                                aria-hidden
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ) : (
                         <div className="header-cell">
                           <button
                             type="button"
@@ -520,32 +625,7 @@ export function DataGrid({
                             </button>
                           </div>
                         </div>
-                        <div className="header-filter">
-                          {column.filterable ? (
-                            <input
-                              className="header-filter-input"
-                              placeholder={`Filter ${column.label}`}
-                              value={filterDraft[column.field]?.value ?? ""}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setFilterDraft((previous) => ({
-                                  ...previous,
-                                  [column.field]: {
-                                    value,
-                                    operator:
-                                      column.filterOperator || "contains",
-                                  },
-                                }));
-                              }}
-                            />
-                          ) : (
-                            <span
-                              className="header-filter-spacer"
-                              aria-hidden
-                            />
-                          )}
-                        </div>
-                      </div>
+                      )}
                     </th>
                   );
                 })}
