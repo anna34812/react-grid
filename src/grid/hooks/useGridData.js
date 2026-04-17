@@ -6,16 +6,7 @@ export const useGridData = (queryState, setTotalCount) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
-  const requestQuery = useMemo(
-    () => ({
-      page: queryState.page,
-      pageSize: queryState.pageSize,
-      sortField: queryState.sortField,
-      sortDirection: queryState.sortDirection,
-      filters: queryState.filters ?? {},
-    }),
-    [queryState.page, queryState.pageSize, queryState.sortField, queryState.sortDirection, queryState.filters],
-  );
+  const requestQuery = useMemo(() => ({ page: queryState.page, pageSize: queryState.pageSize, sortField: queryState.sortField, sortDirection: queryState.sortDirection, filters: queryState.filters ?? {} }), [queryState.page, queryState.pageSize, queryState.sortField, queryState.sortDirection, queryState.filters]);
 
   useEffect(() => {
     let active = true;

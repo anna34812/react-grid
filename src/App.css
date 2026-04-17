@@ -226,6 +226,53 @@
   color: #fff;
 }
 
+.column-drag-handle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.column-drag-handle:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
+.column-th--drag-over {
+  outline: 2px solid #6366f1;
+  outline-offset: -2px;
+  background: #f5f3ff;
+}
+
+.column-th--movable {
+  cursor: grab;
+}
+
+.column-th--movable > .header-cell,
+.column-th--movable .header-stack > .header-cell {
+  user-select: none;
+}
+
+.column-th--movable .header-filter-input {
+  user-select: text;
+}
+
+.column-th--movable:active {
+  cursor: grabbing;
+}
+
 .header-button {
   border: none;
   background: transparent;

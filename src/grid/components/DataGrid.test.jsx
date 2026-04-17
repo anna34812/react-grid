@@ -6,28 +6,12 @@ import { resetDataStore } from "../mock/server";
 
 const columns = [
   { field: "id", label: "ID", editable: false, filterable: false },
-  {
-    field: "name",
-    label: "Name",
-    editable: true,
-    required: true,
-    filterable: true,
-    filterOperator: "contains",
-  },
-  {
-    field: "status",
-    label: "Status",
-    editable: true,
-    required: true,
-    filterable: true,
-    filterOperator: "eq",
-  },
+  { field: "name", label: "Name", editable: true, required: true, filterable: true, filterOperator: "contains" },
+  { field: "status", label: "Status", editable: true, required: true, filterable: true, filterOperator: "eq" },
 ];
 
 describe("DataGrid", () => {
-  beforeEach(() => {
-    resetDataStore();
-  });
+  beforeEach(() => resetDataStore());
 
   it("loads rows and supports pagination", async () => {
     render(<DataGrid columns={columns} />);
@@ -41,9 +25,7 @@ describe("DataGrid", () => {
     const { container } = render(<DataGrid columns={columns} />);
     await screen.findByText("User 1");
 
-    const nameSortButton = container.querySelector(
-      'th[data-field="name"] .header-button',
-    );
+    const nameSortButton = container.querySelector('th[data-field="name"] .header-button');
     await userEvent.click(nameSortButton);
     await userEvent.click(nameSortButton);
 
@@ -60,9 +42,7 @@ describe("DataGrid", () => {
     await userEvent.type(input, "Updated User");
     await userEvent.keyboard("{Enter}");
 
-    expect(
-      await screen.findByRole("button", { name: "Updated User" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Updated User" })).toBeInTheDocument();
   });
 
   it("focuses edit input immediately on double click", async () => {
@@ -98,9 +78,7 @@ describe("DataGrid", () => {
 
   it("reports current edited row and cumulative edited rows", async () => {
     const onEditedRowsChange = vi.fn();
-    render(
-      <DataGrid columns={columns} onEditedRowsChange={onEditedRowsChange} />,
-    );
+    render(<DataGrid columns={columns} onEditedRowsChange={onEditedRowsChange} />);
 
     const firstRowName = await screen.findByRole("button", { name: "User 1" });
     await userEvent.dblClick(firstRowName);
@@ -168,16 +146,14 @@ describe("DataGrid", () => {
               void updateValue(event.target.value);
             }}
           >
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
+            <option value='active'>active</option>
+            <option value='disabled'>disabled</option>
           </select>
         ),
       },
     ];
 
-    render(
-      <DataGrid columns={customColumns} onEditedRowsChange={onEditedRowsChange} />,
-    );
+    render(<DataGrid columns={customColumns} onEditedRowsChange={onEditedRowsChange} />);
     const statusSelect = await screen.findByRole("combobox", { name: "status-1" });
     await userEvent.selectOptions(statusSelect, "disabled");
 
@@ -197,18 +173,14 @@ describe("DataGrid", () => {
     await userEvent.type(statusFilter, "disabled");
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: "active" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "active" })).not.toBeInTheDocument();
     });
   });
 
   it("hides filter inputs when enableFiltering is false", async () => {
     render(<DataGrid columns={columns} enableFiltering={false} />);
     await screen.findByText("User 1");
-    expect(
-      screen.queryByPlaceholderText("Filter Status"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Filter Status")).not.toBeInTheDocument();
   });
 
   it("moves left-pinned columns ahead of earlier unpinned columns", async () => {
@@ -241,12 +213,27 @@ describe("DataGrid", () => {
     const { container } = render(<DataGrid columns={pinnedColumns} />);
     await screen.findByText("User 1");
 
-    const headerFields = [
-      ...container.querySelectorAll("thead tr:first-child th"),
-    ].map((cell) => cell.getAttribute("data-field"));
+    const headerFields = [...container.querySelectorAll("thead tr:first-child th")].map((cell) => cell.getAttribute("data-field"));
 
     expect(headerFields[0]).toBe("id");
     expect(headerFields[1]).toBe("name");
+  });
+
+  it("shows column move handles when enableColumnReorder is true", async () => {
+    render(<DataGrid columns={columns} enableColumnReorder />);
+    await screen.findByText("User 1");
+
+    const moveHandles = screen.getAllByRole("button", { name: /^Move column / });
+    expect(moveHandles.length).toBe(columns.length);
+  });
+
+  it("hides the ⠿ handle for columns with movable: true", async () => {
+    const movableColumns = [{ field: "id", label: "ID", editable: false, filterable: false, movable: true }, ...columns.slice(1)];
+    render(<DataGrid columns={movableColumns} enableColumnReorder />);
+    await screen.findByText("User 1");
+
+    const moveHandles = screen.queryAllByRole("button", { name: /^Move column / });
+    expect(moveHandles.length).toBe(movableColumns.length - 1);
   });
 
   it("pins a column to the right from the header control", async () => {
@@ -255,9 +242,7 @@ describe("DataGrid", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Pin ID right" }));
 
-    const headerFields = [
-      ...container.querySelectorAll("thead tr:first-child th"),
-    ].map((cell) => cell.getAttribute("data-field"));
+    const headerFields = [...container.querySelectorAll("thead tr:first-child th")].map((cell) => cell.getAttribute("data-field"));
 
     expect(headerFields.at(-1)).toBe("id");
   });
@@ -325,12 +310,8 @@ describe("DataGrid", () => {
     await screen.findByText("User 1");
     expect(container.querySelector('[data-field="__select__"]')).toBeNull();
 
-    const row1Id = container.querySelector(
-      'tbody tr td[data-field="id"] .cell-display',
-    );
-    const row2Id = container.querySelector(
-      'tbody tr:nth-child(2) td[data-field="id"] .cell-display',
-    );
+    const row1Id = container.querySelector('tbody tr td[data-field="id"] .cell-display');
+    const row2Id = container.querySelector('tbody tr:nth-child(2) td[data-field="id"] .cell-display');
 
     await userEvent.click(row1Id);
     expect(onSelectionChange.mock.calls.at(-1)[0].selectedIds).toEqual([1]);
