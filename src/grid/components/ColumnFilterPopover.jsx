@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const FilterFunnelIcon = () => (
-  <svg className='filter-funnel-svg' width='16' height='16' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg' aria-hidden>
-    <path d='M4 5h16l-6.5 8.2v4.8L10.5 19v-5.8L4 5z' stroke='currentColor' strokeWidth='1.5' strokeLinejoin='round' />
+  <svg className="filter-funnel-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+    <path d="M4 5h16l-6.5 8.2v4.8L10.5 19v-5.8L4 5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
   </svg>
 );
 
@@ -14,10 +14,10 @@ export function ColumnFilterPopover({ isOpen, onClose, anchorEl, label, distinct
   const popoverRef = useRef(null);
   const selectAllRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [listSearch, setListSearch] = useState("");
+  const [listSearch, setListSearch] = useState('');
 
   useEffect(() => {
-    if (!isOpen) setListSearch("");
+    if (!isOpen) setListSearch('');
   }, [isOpen]);
 
   const filteredList = useMemo(() => {
@@ -62,35 +62,35 @@ export function ColumnFilterPopover({ isOpen, onClose, anchorEl, label, distinct
       if (popoverRef.current?.contains(e.target) || anchorEl?.contains(e.target)) return;
       onClose();
     };
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const onKey = (e) => e.key === 'Escape' && onClose();
 
-    document.addEventListener("mousedown", closeOnOutside);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener('mousedown', closeOnOutside);
+    document.addEventListener('keydown', onKey);
 
     return () => {
-      document.removeEventListener("mousedown", closeOnOutside);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener('mousedown', closeOnOutside);
+      document.removeEventListener('keydown', onKey);
     };
   }, [isOpen, onClose, anchorEl]);
 
-  if (!isOpen || typeof document === "undefined") return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const popover = (
-    <div ref={popoverRef} role='dialog' aria-label={`Filter ${label}`} className='column-filter-popover' style={{ position: "fixed", top: position.top, left: position.left, zIndex: 10000 }}>
-      <div className='column-filter-popover-search'>
-        <span className='column-filter-popover-search-icon' aria-hidden>
+    <div ref={popoverRef} role="dialog" aria-label={`Filter ${label}`} className="column-filter-popover" style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 10000 }}>
+      <div className="column-filter-popover-search">
+        <span className="column-filter-popover-search-icon" aria-hidden>
           🔍
         </span>
-        <input type='search' className='column-filter-popover-search-input' placeholder='Search...' value={listSearch} onChange={(e) => setListSearch(e.target.value)} autoFocus />
+        <input type="search" className="column-filter-popover-search-input" placeholder="Search..." value={listSearch} onChange={(e) => setListSearch(e.target.value)} autoFocus />
       </div>
-      <div className='column-filter-popover-list' role='listbox'>
-        <label className='column-filter-popover-row column-filter-popover-row--all'>
-          <input ref={selectAllRef} type='checkbox' checked={allFilteredSelected} onChange={toggleAllFiltered} />
+      <div className="column-filter-popover-list" role="listbox">
+        <label className="column-filter-popover-row column-filter-popover-row--all">
+          <input ref={selectAllRef} type="checkbox" checked={allFilteredSelected} onChange={toggleAllFiltered} />
           <span>(Select All)</span>
         </label>
         {filteredList.map((value) => (
-          <label key={value} className='column-filter-popover-row'>
-            <input type='checkbox' checked={selectedValues.includes(value)} onChange={() => toggleOne(value)} />
+          <label key={value} className="column-filter-popover-row">
+            <input type="checkbox" checked={selectedValues.includes(value)} onChange={() => toggleOne(value)} />
             <span>{value}</span>
           </label>
         ))}

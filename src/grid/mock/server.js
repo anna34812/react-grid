@@ -1,5 +1,5 @@
-import { mockRows } from "./data";
-import { treeFlatRows } from "./treeData";
+import { mockRows } from './data';
+import { treeFlatRows } from './treeData';
 
 let dataStore = [...mockRows];
 let treeDataStore = [...treeFlatRows];
@@ -12,17 +12,17 @@ export const resetDataStore = () => {
 const applyFilters = (rows, filters) => {
   return rows.filter((row) => {
     return Object.entries(filters).every(([field, filter]) => {
-      if (!filter || filter.value === undefined || filter.value === "") return true;
+      if (!filter || filter.value === undefined || filter.value === '') return true;
       if (Array.isArray(filter.value) && filter.value.length === 0) return false;
 
       const rawValue = row[field];
-      if (filter.operator === "in" && Array.isArray(filter.value)) return filter.value.some((v) => v == rawValue || String(v) === String(rawValue));
+      if (filter.operator === 'in' && Array.isArray(filter.value)) return filter.value.some((v) => v == rawValue || String(v) === String(rawValue));
 
-      const rowValue = rawValue == null ? "" : String(rawValue).toLowerCase();
+      const rowValue = rawValue == null ? '' : String(rawValue).toLowerCase();
       const filterValue = String(filter.value).toLowerCase();
-      if (filter.operator === "eq") return rowValue === filterValue;
-      if (filter.operator === "gte") return Number(rawValue) >= Number(filter.value);
-      if (filter.operator === "lte") return Number(rawValue) <= Number(filter.value);
+      if (filter.operator === 'eq') return rowValue === filterValue;
+      if (filter.operator === 'gte') return Number(rawValue) >= Number(filter.value);
+      if (filter.operator === 'lte') return Number(rawValue) <= Number(filter.value);
       return rowValue.includes(filterValue);
     });
   });
@@ -39,7 +39,7 @@ const applySort = (rows, sortField, sortDirection) => {
     return -1;
   });
 
-  return sortDirection === "desc" ? sortedRows.reverse() : sortedRows;
+  return sortDirection === 'desc' ? sortedRows.reverse() : sortedRows;
 };
 
 export async function fetchRows(queryState) {
@@ -79,7 +79,7 @@ export async function fetchDistinctColumnValues(field, options = {}) {
 export async function updateRow(id, updates, options = {}) {
   const store = options.treeMode ? treeDataStore : dataStore;
   const rowIndex = store.findIndex((row) => row.id === id);
-  if (rowIndex < 0) throw new Error("Row not found");
+  if (rowIndex < 0) throw new Error('Row not found');
 
   const updatedRow = { ...store[rowIndex], ...updates };
   store[rowIndex] = updatedRow;

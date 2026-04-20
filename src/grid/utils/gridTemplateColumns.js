@@ -1,13 +1,13 @@
-import { getColumnMinWidth } from "./columnPinning";
+import { getColumnMinWidth } from './columnPinning';
 
 /** Tabulator-style column width behavior (per pane / section). */
 export const COLUMN_SIZE_MODE = {
   /** Fixed pixel tracks from min width + resize (default). */
-  FIT_DATA: "fitData",
+  FIT_DATA: 'fitData',
   /** Center pane: fixed tracks except the last unpinned column (`minmax(px, 1fr)`). Pinned panes stay `px`. */
-  FIT_DATA_STRETCH_LAST: "fitDataStretchLast",
+  FIT_DATA_STRETCH_LAST: 'fitDataStretchLast',
   /** Unpinned (center) columns use `minmax(px, 1fr)` to share remaining row width; pinned left/right stay fixed `px`. */
-  FIT_WIDTH: "fitWidth",
+  FIT_WIDTH: 'fitWidth',
 };
 
 function normalizeColumnSizeMode(mode) {
@@ -22,18 +22,12 @@ function normalizeColumnSizeMode(mode) {
  * @param {{ section?: "left" | "center" | "right" }} [options] Pass the pane id from `renderSectionGrid` so pinned vs center is respected.
  */
 export function buildGridTemplateColumns(sectionColumns, options = {}) {
-  const {
-    showRowDrag = false,
-    showSelect = false,
-    columnWidths = {},
-    columnSizeMode: columnSizeModeRaw,
-    section = "center",
-  } = options;
+  const { showRowDrag = false, showSelect = false, columnWidths = {}, columnSizeMode: columnSizeModeRaw, section = 'center' } = options;
   const columnSizeMode = normalizeColumnSizeMode(columnSizeModeRaw);
-  const flexiblePane = section === "center";
+  const flexiblePane = section === 'center';
   const parts = [];
-  if (showRowDrag) parts.push("36px");
-  if (showSelect) parts.push("44px");
+  if (showRowDrag) parts.push('36px');
+  if (showSelect) parts.push('44px');
 
   const n = sectionColumns.length;
   for (let i = 0; i < n; i++) {
@@ -52,5 +46,5 @@ export function buildGridTemplateColumns(sectionColumns, options = {}) {
     }
   }
 
-  return parts.join(" ");
+  return parts.join(' ');
 }

@@ -1,31 +1,31 @@
-import { useState } from "react";
-import { patchRow } from "../api/gridApi";
+import { useState } from 'react';
+import { patchRow } from '../api/gridApi';
 
 const validateValue = (column, value) => {
-  if (!column.editable) return "This field is read only.";
-  if (column.required && (value == null || value === "")) return "Value is required.";
-  if (column.type === "number" && Number.isNaN(Number(value))) return "Number is required.";
+  if (!column.editable) return 'This field is read only.';
+  if (column.required && (value == null || value === '')) return 'Value is required.';
+  if (column.type === 'number' && Number.isNaN(Number(value))) return 'Number is required.';
 
-  return "";
+  return '';
 };
 
 export const useInlineEdit = (setRows, options = {}) => {
   const apiOptions = options.apiOptions ?? {};
   const [editingCell, setEditingCell] = useState(null);
-  const [draftValue, setDraftValue] = useState("");
+  const [draftValue, setDraftValue] = useState('');
   const [savingCell, setSavingCell] = useState(null);
-  const [editError, setEditError] = useState("");
+  const [editError, setEditError] = useState('');
 
   const startEdit = (rowId, field, value) => {
-    setEditError("");
+    setEditError('');
     setEditingCell({ rowId, field });
-    setDraftValue(value ?? "");
+    setDraftValue(value ?? '');
   };
 
   const cancelEdit = () => {
     setEditingCell(null);
-    setDraftValue("");
-    setEditError("");
+    setDraftValue('');
+    setEditError('');
   };
 
   const saveEdit = async ({ rowId, field, column }) => {
@@ -35,11 +35,11 @@ export const useInlineEdit = (setRows, options = {}) => {
       return false;
     }
 
-    const nextValue = column.type === "number" ? Number(draftValue) : draftValue;
+    const nextValue = column.type === 'number' ? Number(draftValue) : draftValue;
     const previousRows = [];
 
     setSavingCell({ rowId, field });
-    setEditError("");
+    setEditError('');
     setRows((rows) => {
       previousRows.push(...rows);
       return rows.map((row) => (row.id === rowId ? { ...row, [field]: nextValue } : row));
@@ -48,11 +48,11 @@ export const useInlineEdit = (setRows, options = {}) => {
     try {
       await patchRow(rowId, { [field]: nextValue }, apiOptions);
       setEditingCell(null);
-      setDraftValue("");
+      setDraftValue('');
       return true;
     } catch (errorResponse) {
       setRows(previousRows);
-      setEditError(errorResponse.message || "Failed to save value");
+      setEditError(errorResponse.message || 'Failed to save value');
       return false;
     } finally {
       setSavingCell(null);

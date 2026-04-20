@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getColumnSections } from "../utils/columnPinning";
-import { mergeRowSelection, toIdSet } from "../utils/rowSelection";
-import { collectSubtreeIds } from "../utils/treeData";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getColumnSections } from '../utils/columnPinning';
+import { mergeRowSelection, toIdSet } from '../utils/rowSelection';
+import { collectSubtreeIds } from '../utils/treeData';
 
 /**
  * Row selection, pane placement for the checkbox column, and background-click selection.
  * @param {{ groupSelection?: 'self' | 'descendants'; childrenMap?: Map<unknown, unknown[]> } | undefined} [treeOptions] Tree grid: when `groupSelection` is `descendants` and the row has children, toggling selects the whole subtree.
  */
-export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectionChange, orderedColumns, pinnedOverrides, rows, viewRowIds, rowIdField = "id", treeOptions }) {
+export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectionChange, orderedColumns, pinnedOverrides, rows, viewRowIds, rowIdField = 'id', treeOptions }) {
   const rs = useMemo(() => mergeRowSelection(rowSelectionProp), [rowSelectionProp]);
-  const selectionEnabled = rs.mode === "single" || rs.mode === "multi";
+  const selectionEnabled = rs.mode === 'single' || rs.mode === 'multi';
   const showSelectColumn = selectionEnabled && rs.checkboxes;
   const enableClickSelection = selectionEnabled && rs.enableClickSelection;
   const isControlled = rs.selectedIds !== undefined;
@@ -29,17 +29,17 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
 
   const selectionPane = useMemo(() => {
     if (!showSelectColumn) return null;
-    if (leftColumns.length > 0) return "left";
-    if (centerColumns.length > 0) return "center";
-    if (rightColumns.length > 0) return "right";
+    if (leftColumns.length > 0) return 'left';
+    if (centerColumns.length > 0) return 'center';
+    if (rightColumns.length > 0) return 'right';
 
     return null;
   }, [showSelectColumn, leftColumns.length, centerColumns.length, rightColumns.length]);
 
   const leadingPane = useMemo(() => {
-    if (leftColumns.length > 0) return "left";
-    if (centerColumns.length > 0) return "center";
-    if (rightColumns.length > 0) return "right";
+    if (leftColumns.length > 0) return 'left';
+    if (centerColumns.length > 0) return 'center';
+    if (rightColumns.length > 0) return 'right';
 
     return null;
   }, [leftColumns.length, centerColumns.length, rightColumns.length]);
@@ -65,11 +65,7 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
     (rowId) => {
       if (!selectionEnabled) return;
 
-      if (
-        rs.mode === "multi" &&
-        treeOptions?.groupSelection === "descendants" &&
-        treeOptions.childrenMap
-      ) {
+      if (rs.mode === 'multi' && treeOptions?.groupSelection === 'descendants' && treeOptions.childrenMap) {
         const childList = treeOptions.childrenMap.get(rowId);
         if (childList && childList.length > 0) {
           const subtreeIds = collectSubtreeIds(rowId, treeOptions.childrenMap);
@@ -83,7 +79,7 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
       }
 
       const next = new Set(selectedSet);
-      if (rs.mode === "single") {
+      if (rs.mode === 'single') {
         if (next.has(rowId)) next.clear();
         else {
           next.clear();
@@ -97,7 +93,7 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
   );
 
   const toggleSelectAllInView = useCallback(() => {
-    if (rs.mode !== "multi" || !rs.checkboxes) return;
+    if (rs.mode !== 'multi' || !rs.checkboxes) return;
 
     const next = new Set(selectedSet);
     if (allSelectedInView) viewRowIds.forEach((id) => next.delete(id));
@@ -109,7 +105,7 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
   const applySelectionForRowClick = useCallback(
     (event, rowId) => {
       if (!enableClickSelection) return;
-      const multiClickWithoutCheckbox = rs.mode === "multi" && !rs.checkboxes && enableClickSelection;
+      const multiClickWithoutCheckbox = rs.mode === 'multi' && !rs.checkboxes && enableClickSelection;
       if (multiClickWithoutCheckbox) {
         const additive = event.ctrlKey || event.metaKey;
         if (additive) toggleRowSelection(rowId);
@@ -133,13 +129,13 @@ export function useGridRowSelection({ rowSelection: rowSelectionProp, onSelectio
   const handleRowBackgroundClick = useCallback(
     (event, rowId) => {
       if (!enableClickSelection) return;
-      if (event.target.closest("[data-no-row-select]")) return;
-      if (event.target.closest("[data-edit-host]")) return;
-      if (event.target.closest("[data-editable-cell]")) return;
+      if (event.target.closest('[data-no-row-select]')) return;
+      if (event.target.closest('[data-edit-host]')) return;
+      if (event.target.closest('[data-editable-cell]')) return;
 
-      const btn = event.target.closest("button");
+      const btn = event.target.closest('button');
       if (btn && !btn.disabled) return;
-      if (event.target.closest("input, select, textarea, a, label")) return;
+      if (event.target.closest('input, select, textarea, a, label')) return;
 
       applySelectionForRowClick(event, rowId);
     },

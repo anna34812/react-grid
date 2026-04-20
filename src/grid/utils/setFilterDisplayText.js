@@ -12,13 +12,13 @@ export function fitSetFilterDisplayText(count, values, maxWidthPx, measureText) 
   if (!values?.length) return prefix.trim();
   if (maxWidthPx <= 0) return prefix.trim();
 
-  const full = prefix + values.join(", ");
+  const full = prefix + values.join(', ');
   if (measureText(full) <= maxWidthPx) return full;
 
   const n = values.length;
 
   const candidateForK = (k) => {
-    const part = values.slice(0, k).join(", ");
+    const part = values.slice(0, k).join(', ');
     if (k < n) return `${prefix}${part}, ...`;
     return `${prefix}${part}`;
   };
@@ -51,7 +51,7 @@ export function fitSetFilterDisplayText(count, values, maxWidthPx, measureText) 
  * @param {(text: string) => number} measureText
  */
 function truncateToWidth(text, maxWidthPx, measureText) {
-  const ell = "...";
+  const ell = '...';
   if (measureText(ell) > maxWidthPx) return ell;
 
   let lo = 0;

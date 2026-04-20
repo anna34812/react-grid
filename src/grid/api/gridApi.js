@@ -1,5 +1,5 @@
-import { fetchDistinctColumnValues as fetchDistinctFromServer, fetchRows, updateRow } from "../mock/server";
-import { buildQueryParams } from "../utils/query";
+import { fetchDistinctColumnValues as fetchDistinctFromServer, fetchRows, updateRow } from '../mock/server';
+import { buildQueryParams } from '../utils/query';
 
 export async function getRows(queryState) {
   const queryParams = buildQueryParams(queryState);

@@ -4,8 +4,8 @@
  * @returns {Set<unknown>} ids that have at least one child
  */
 export function getIdsWithChildren(rows, options = {}) {
-  const idField = options.idField ?? "id";
-  const parentField = options.parentField ?? "parentId";
+  const idField = options.idField ?? 'id';
+  const parentField = options.parentField ?? 'parentId';
   const withChildren = new Set();
   for (const row of rows) {
     const p = row[parentField];
@@ -23,8 +23,8 @@ export function getIdsWithChildren(rows, options = {}) {
  * @returns {Record<string, unknown>[]}
  */
 export function flattenTreeRows(rows, expandedIds, options = {}) {
-  const idField = options.idField ?? "id";
-  const parentField = options.parentField ?? "parentId";
+  const idField = options.idField ?? 'id';
+  const parentField = options.parentField ?? 'parentId';
 
   const byId = new Map(rows.map((r) => [r[idField], r]));
   const children = new Map();
@@ -80,8 +80,8 @@ export function flattenTreeRows(rows, expandedIds, options = {}) {
  * @returns {Map<unknown, number>}
  */
 export function computeTreeAggregates(rows, options) {
-  const idField = options.idField ?? "id";
-  const parentField = options.parentField ?? "parentId";
+  const idField = options.idField ?? 'id';
+  const parentField = options.parentField ?? 'parentId';
   const valueField = options.valueField;
 
   const children = new Map();
@@ -112,7 +112,7 @@ export function computeTreeAggregates(rows, options) {
     for (const cid of kids) sum += dfs(cid);
     memo.set(id, sum);
     return sum;
-  }
+  };
 
   for (const r of rows) dfs(r[idField]);
 
@@ -125,8 +125,8 @@ export function computeTreeAggregates(rows, options) {
  * @returns {Map<unknown, unknown[]>}
  */
 export function getChildrenMap(rows, options = {}) {
-  const idField = options.idField ?? "id";
-  const parentField = options.parentField ?? "parentId";
+  const idField = options.idField ?? 'id';
+  const parentField = options.parentField ?? 'parentId';
   /** @type {Map<unknown, unknown[]>} */
   const children = new Map();
   const orderIndex = new Map(rows.map((r, i) => [r[idField], i]));
@@ -165,8 +165,8 @@ export function collectSubtreeIds(rootId, childrenMap) {
 
 /** @param {number} bytes */
 export function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "";
-  const units = ["B", "KB", "MB", "GB"];
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
   let v = bytes;
   let u = 0;
   while (v >= 1024 && u < units.length - 1) {

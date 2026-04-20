@@ -1,25 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useGridQuery } from "../hooks/useGridQuery";
-import { useGridData } from "../hooks/useGridData";
-import { useInlineEdit } from "../hooks/useInlineEdit";
-import { patchRow } from "../api/gridApi";
-import { getColumnMinWidth, getEffectivePin, isColumnResizable } from "../utils/columnPinning";
-import { nextSortDirection } from "../utils/gridSort";
-import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
-import { collectSubtreeIds, computeTreeAggregates, flattenTreeRows, getChildrenMap, getIdsWithChildren } from "../utils/treeData";
-import { useGridColumnOrder } from "../hooks/useGridColumnOrder";
-import { useGridEditFocus } from "../hooks/useGridEditFocus";
-import { useGridFilters } from "../hooks/useGridFilters";
-import { useGridRowSelection } from "../hooks/useGridRowSelection";
-import { useGridSplitSync } from "../hooks/useGridSplitSync";
-import { useGridColumnResize } from "../hooks/useGridColumnResize";
-import { ColumnFilterPopover, FilterFunnelIcon } from "./ColumnFilterPopover";
-import { ColumnResizeHandle } from "./ColumnResizeHandle";
-import { SetFilterSummaryReadonlyInput } from "./SetFilterSummaryReadonlyInput";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useGridQuery } from '../hooks/useGridQuery';
+import { useGridData } from '../hooks/useGridData';
+import { useInlineEdit } from '../hooks/useInlineEdit';
+import { patchRow } from '../api/gridApi';
+import { getColumnMinWidth, getEffectivePin, isColumnResizable } from '../utils/columnPinning';
+import { nextSortDirection } from '../utils/gridSort';
+import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
+import { collectSubtreeIds, computeTreeAggregates, flattenTreeRows, getChildrenMap, getIdsWithChildren } from '../utils/treeData';
+import { useGridColumnOrder } from '../hooks/useGridColumnOrder';
+import { useGridEditFocus } from '../hooks/useGridEditFocus';
+import { useGridFilters } from '../hooks/useGridFilters';
+import { useGridRowSelection } from '../hooks/useGridRowSelection';
+import { useGridSplitPaneScrollSync } from '../hooks/useGridSplitPaneScrollSync';
+import { useGridSplitSync } from '../hooks/useGridSplitSync';
+import { useGridColumnResize } from '../hooks/useGridColumnResize';
+import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
+import { ColumnResizeHandle } from './ColumnResizeHandle';
+import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
 /** Re-export for convenience; same shape as DataGrid. */
-export { DEFAULT_ROW_SELECTION } from "../utils/rowSelection";
-export { COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
+export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
+export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
 /** Must match `.tree-row-height-anim--animate` / `--animate-out` duration in App.css */
 const TREE_ROW_ANIM_MS = 420;
@@ -34,28 +35,15 @@ const TREE_ROW_STAGGER_MS = 32;
  * Columns may set `resizable: false` to disable resize grip and double-click auto-fit for that column.
  * `columnSizeMode`: same as DataGrid (`fitData`, `fitDataStretchLast`, `fitWidth`).
  */
-export const TreeDataGrid = ({
-  columns,
-  treeData: treeDataConfig,
-  columnOrder: columnOrderProp,
-  onColumnOrderChange,
-  enableColumnReorder = false,
-  rowSelection: rowSelectionProp,
-  onSelectionChange,
-  onEditedRowsChange,
-  enableFiltering = true,
-  animateRows = true,
-  enableColumnResize = true,
-  columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA,
-}) => {
+export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
   const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: true } });
-  const treeParentField = treeDataConfig.parentField ?? "parentId";
-  const treeRowIdField = treeDataConfig.rowIdField ?? "id";
-  const treeExpandColumnField = treeDataConfig.expandColumnField ?? "name";
+  const treeParentField = treeDataConfig.parentField ?? 'parentId';
+  const treeRowIdField = treeDataConfig.rowIdField ?? 'id';
+  const treeExpandColumnField = treeDataConfig.expandColumnField ?? 'name';
   const treeIndentPerLevel = treeDataConfig.indentPerLevel ?? 16;
   const [expandedRowIds, setExpandedRowIds] = useState(() => new Set());
   /** While set, that node is visually collapsed but children stay mounted until close animation finishes. */
@@ -97,7 +85,7 @@ export const TreeDataGrid = ({
 
   const childrenMap = useMemo(() => getChildrenMap(rows, { idField: treeRowIdField, parentField: treeParentField }), [rows, treeRowIdField, treeParentField]);
 
-  const [groupSelection, setGroupSelection] = useState(() => treeDataConfig.groupSelection ?? "self");
+  const [groupSelection, setGroupSelection] = useState(() => treeDataConfig.groupSelection ?? 'self');
   useEffect(() => {
     if (treeDataConfig.groupSelection !== undefined) setGroupSelection(treeDataConfig.groupSelection);
   }, [treeDataConfig.groupSelection]);
@@ -251,26 +239,7 @@ export const TreeDataGrid = ({
 
   const viewRowIds = useMemo(() => flattenedRows.map((r) => r[treeRowIdField]), [flattenedRows, treeRowIdField]);
 
-  const {
-    rs,
-    selectedSet,
-    selectionEnabled,
-    showSelectColumn,
-    enableClickSelection,
-    leftColumns,
-    centerColumns,
-    rightColumns,
-    hasSplit,
-    selectionPane,
-    leadingPane,
-    toggleRowSelection,
-    toggleSelectAllInView,
-    allSelectedInView,
-    someSelectedInView,
-    applySelectionForRowClick,
-    handleRowBackgroundClick,
-    editableClickSelectionTimerRef,
-  } = useGridRowSelection({
+  const { rs, selectedSet, selectionEnabled, showSelectColumn, enableClickSelection, leftColumns, centerColumns, rightColumns, hasSplit, selectionPane, leadingPane, toggleRowSelection, toggleSelectAllInView, allSelectedInView, someSelectedInView, applySelectionForRowClick, handleRowBackgroundClick, editableClickSelectionTimerRef } = useGridRowSelection({
     rowSelection: rowSelectionProp,
     onSelectionChange,
     orderedColumns,
@@ -289,7 +258,9 @@ export const TreeDataGrid = ({
 
   useGridEditFocus(editingCell);
 
-  const gridSplitRowRef = useGridSplitSync({ hasSplit, rowCount: flattenedRows.length, variant: "tree" });
+  const gridSplitRowRef = useGridSplitSync({ hasSplit, rowCount: flattenedRows.length, variant: 'tree' });
+
+  useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, flattenedRows.length);
 
   const hasRows = flattenedRows.length > 0;
 
@@ -317,7 +288,7 @@ export const TreeDataGrid = ({
   const handleSaveEdit = useCallback(
     async ({ row, column }) => {
       const previousRow = row;
-      const nextValue = column.type === "number" ? Number(draftValue) : draftValue;
+      const nextValue = column.type === 'number' ? Number(draftValue) : draftValue;
       const didSave = await saveEdit({ rowId: row.id, field: column.field, column });
       if (!didSave) return;
 
@@ -328,7 +299,7 @@ export const TreeDataGrid = ({
 
   const updateCustomCellValue = useCallback(
     async ({ row, column, nextValue }) => {
-      const normalizedValue = column.type === "number" ? Number(nextValue) : nextValue;
+      const normalizedValue = column.type === 'number' ? Number(nextValue) : nextValue;
       if (Object.is(row[column.field], normalizedValue)) return true;
 
       const previousRows = [];
@@ -361,7 +332,7 @@ export const TreeDataGrid = ({
       const stopEditHostBubble = (event) => event.stopPropagation();
       const commitEditIfChanged = () => {
         if (isSaving) return false;
-        const previousValue = row[column.field] == null ? "" : String(row[column.field]);
+        const previousValue = row[column.field] == null ? '' : String(row[column.field]);
         if (draftValue === previousValue) {
           cancelEdit();
           return true;
@@ -377,36 +348,36 @@ export const TreeDataGrid = ({
         commitEditIfChanged();
       };
       const handleEditHostKeyDown = (event) => {
-        if (event.key === "Enter") {
-          if (event.target.closest("textarea")) return;
+        if (event.key === 'Enter') {
+          if (event.target.closest('textarea')) return;
 
           event.preventDefault();
           event.stopPropagation();
           commitEditIfChanged();
         }
-        if (event.key === "Escape") {
+        if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
           cancelEdit();
         }
       };
 
-      if (typeof column.renderEditCell === "function") {
+      if (typeof column.renderEditCell === 'function') {
         return (
-          <div className='edit-cell' data-no-row-select data-edit-host onPointerDown={stopEditHostBubble} onPointerUp={stopEditHostBubble} onClick={stopEditHostBubble} onBlur={handleEditHostBlur} onKeyDown={handleEditHostKeyDown}>
+          <div className="edit-cell" data-no-row-select data-edit-host onPointerDown={stopEditHostBubble} onPointerUp={stopEditHostBubble} onClick={stopEditHostBubble} onBlur={handleEditHostBlur} onKeyDown={handleEditHostKeyDown}>
             {column.renderEditCell({ ...baseRenderParams, value: draftValue, setValue: setDraftValue, save: () => handleSaveEdit({ row, column }), cancel: cancelEdit })}
           </div>
         );
       }
 
       return (
-        <div className='edit-cell' data-no-row-select data-edit-host onPointerDown={stopEditHostBubble} onPointerUp={stopEditHostBubble} onClick={stopEditHostBubble} onBlur={handleEditHostBlur} onKeyDown={handleEditHostKeyDown}>
+        <div className="edit-cell" data-no-row-select data-edit-host onPointerDown={stopEditHostBubble} onPointerUp={stopEditHostBubble} onClick={stopEditHostBubble} onBlur={handleEditHostBlur} onKeyDown={handleEditHostKeyDown}>
           <input value={draftValue} disabled={isSaving} onChange={(event) => setDraftValue(event.target.value)} onClick={stopEditHostBubble} onPointerDown={stopEditHostBubble} />
         </div>
       );
     }
 
-    if (typeof column.renderCell === "function") {
+    if (typeof column.renderCell === 'function') {
       return column.renderCell({
         ...baseRenderParams,
         startEdit: () => startEdit(row.id, column.field, row[column.field]),
@@ -414,15 +385,15 @@ export const TreeDataGrid = ({
       });
     }
 
-    if (!column.editable) return <span className='cell-display'>{String(row[column.field])}</span>;
+    if (!column.editable) return <span className="cell-display">{String(row[column.field])}</span>;
 
     const editableCellKey = `${row.id}:${column.field}`;
 
     return (
       <span
-        role='button'
+        role="button"
         tabIndex={isSaving ? -1 : 0}
-        className='cell-button cell-button--editable'
+        className="cell-button cell-button--editable"
         data-editable-cell={editableCellKey}
         aria-disabled={isSaving}
         onClick={(e) => {
@@ -450,7 +421,7 @@ export const TreeDataGrid = ({
         onKeyDown={(e) => {
           if (isSaving) return;
 
-          if (e.key === "Enter" || e.key === " ") {
+          if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             e.stopPropagation();
             startEdit(row.id, column.field, row[column.field]);
@@ -477,7 +448,7 @@ export const TreeDataGrid = ({
     let values = null;
     if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) {
       values = draft.inValues.map(String);
-    } else if (applied?.operator === "in" && Array.isArray(applied.value) && applied.value.length > 0) {
+    } else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) {
       values = applied.value.map(String);
     }
 
@@ -500,27 +471,21 @@ export const TreeDataGrid = ({
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
-        <div className={hasSplit ? "grid-pane-scroll grid-pane-scroll--pinned" : "grid-pane-scroll"} data-hscroll={hasSplit ? "always" : "auto"}>
-          <div
-            className={["tree-data-grid", resizingField ? "tree-data-grid--column-resizing" : ""].filter(Boolean).join(" ") || undefined}
-            data-column-size-mode={columnSizeMode}
-            role='grid'
-            aria-rowcount={flattenedRows.length}
-            aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}
-          >
-            <div className='tree-data-grid-header' role='rowgroup'>
-              <div className='tree-data-grid-header-row' role='row' {...(hasSplit ? { "data-tree-sync-header": "" } : {})} style={{ gridTemplateColumns: colTpl }}>
+        <div className={hasSplit ? 'grid-pane-scroll grid-pane-scroll--pinned' : 'grid-pane-scroll'} data-hscroll={hasSplit ? 'always' : 'auto'}>
+          <div className={['tree-data-grid', resizingField ? 'tree-data-grid--column-resizing' : ''].filter(Boolean).join(' ') || undefined} data-column-size-mode={columnSizeMode} role="grid" aria-rowcount={flattenedRows.length} aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}>
+            <div className="tree-data-grid-header" role="rowgroup">
+              <div className="tree-data-grid-header-row" role="row" {...(hasSplit ? { 'data-tree-sync-header': '' } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingSelect ? (
-                  <div className='tree-grid-header-cell tree-grid-header-cell--select' role='columnheader' data-field='__select__'>
+                  <div className="tree-grid-header-cell tree-grid-header-cell--select" role="columnheader" data-field="__select__">
                     {enableFiltering ? (
-                      <div className='header-stack'>
-                        <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input className='grid-checkbox' type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
-                        <div className='header-filter'>
-                          <span className='header-filter-spacer' aria-hidden />
+                      <div className="header-stack">
+                        <div className="header-cell header-cell--select">{rs.mode === 'multi' ? <input className="grid-checkbox" type="checkbox" aria-label="Select all visible rows" checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
+                        <div className="header-filter">
+                          <span className="header-filter-spacer" aria-hidden />
                         </div>
                       </div>
                     ) : (
-                      <div className='header-cell header-cell--select'>{rs.mode === "multi" ? <input className='grid-checkbox' type='checkbox' aria-label='Select all visible rows' checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
+                      <div className="header-cell header-cell--select">{rs.mode === 'multi' ? <input className="grid-checkbox" type="checkbox" aria-label="Select all visible rows" checked={allSelectedVisible} ref={(el) => el && (el.indeterminate = someSelectedVisible)} onChange={toggleSelectAllVisible} /> : null}</div>
                     )}
                   </div>
                 ) : null}
@@ -530,15 +495,15 @@ export const TreeDataGrid = ({
                   const pin = getEffectivePin(column, pinnedOverrides);
                   const dragOver = enableColumnReorder && dragOverField === column.field;
                   const headerDrag = enableColumnReorder && column.movable === true;
-                  const thClassName = [dragOver && "column-th--drag-over", headerDrag && "column-th--movable", resizingField === column.field && "column-th--resizing"].filter(Boolean).join(" ") || undefined;
+                  const thClassName = [dragOver && 'column-th--drag-over', headerDrag && 'column-th--movable', resizingField === column.field && 'column-th--resizing'].filter(Boolean).join(' ') || undefined;
                   return (
                     <div
                       key={column.field}
-                      role='columnheader'
+                      role="columnheader"
                       style={columnStyle(column)}
                       data-field={column.field}
                       data-pinned={pin ?? undefined}
-                      className={["tree-grid-header-cell", thClassName].filter(Boolean).join(" ") || undefined}
+                      className={['tree-grid-header-cell', thClassName].filter(Boolean).join(' ') || undefined}
                       draggable={headerDrag}
                       onDragStart={headerDrag ? (e) => handleColumnHeaderDragStart(e, column) : undefined}
                       onDragEnd={headerDrag ? () => setDragOverField(null) : undefined}
@@ -546,7 +511,7 @@ export const TreeDataGrid = ({
                         enableColumnReorder
                           ? (e) => {
                               e.preventDefault();
-                              e.dataTransfer.dropEffect = "move";
+                              e.dataTransfer.dropEffect = 'move';
                               setDragOverField(column.field);
                             }
                           : undefined
@@ -555,44 +520,44 @@ export const TreeDataGrid = ({
                       onDropCapture={enableColumnReorder ? (e) => handleColumnDrop(e, column.field) : undefined}
                     >
                       {enableFiltering ? (
-                        <div className='header-stack'>
-                          <div className='header-cell header-cell--title-row'>
-                            <button type='button' className='header-button' onClick={() => handleSort(column.field)}>
+                        <div className="header-stack">
+                          <div className="header-cell header-cell--title-row">
+                            <button type="button" className="header-button" onClick={() => handleSort(column.field)}>
                               {column.label}
-                              {direction === "asc" && " \u2191"}
-                              {direction === "desc" && " \u2193"}
+                              {direction === 'asc' && ' \u2191'}
+                              {direction === 'desc' && ' \u2193'}
                             </button>
                             {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
                               ⋮
                             </button> */}
-                            <div className='pin-actions' role='group' aria-label={`${column.label} pinning`}>
-                              <button type='button' className={`pin-button${pin === "left" ? " active" : ""}`} aria-pressed={pin === "left"} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === "left" ? null : "left")}>
+                            <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
+                              <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
                                 L
                               </button>
-                              <button type='button' className={`pin-button${pin === "right" ? " active" : ""}`} aria-pressed={pin === "right"} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === "right" ? null : "right")}>
+                              <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
                                 R
                               </button>
                             </div>
                           </div>
-                          <div className='header-filter'>
+                          <div className="header-filter">
                             {column.filterable ? (
                               (() => {
                                 const setSummary = getSetFilterSummary(column.field);
-                                const quickValue = filterDraft[column.field]?.quick ?? filterDraft[column.field]?.value ?? "";
+                                const quickValue = filterDraft[column.field]?.quick ?? filterDraft[column.field]?.value ?? '';
 
                                 return (
-                                  <div className={`header-filter-inline${setSummary.isActive ? " header-filter-inline--set-active" : ""}`}>
+                                  <div className={`header-filter-inline${setSummary.isActive ? ' header-filter-inline--set-active' : ''}`}>
                                     {setSummary.isActive ? (
                                       <SetFilterSummaryReadonlyInput count={setSummary.count} values={setSummary.values} columnLabel={column.label} className={`header-filter-input header-filter-input--set-active`} placeholder={`Filter ${column.label}`} onClick={() => void toggleColumnFilterPopover(column.field)} />
                                     ) : (
                                       <input
-                                        className='header-filter-input'
+                                        className="header-filter-input"
                                         placeholder={`Filter ${column.label}`}
                                         aria-label={`Filter ${column.label}`}
                                         value={quickValue}
                                         onChange={(event) => {
                                           const value = event.target.value;
-                                          const operator = column.filterOperator || "contains";
+                                          const operator = column.filterOperator || 'contains';
                                           setFilterDraft((previous) => ({
                                             ...previous,
                                             [column.field]: { quick: value, operator, inValues: undefined },
@@ -601,12 +566,12 @@ export const TreeDataGrid = ({
                                       />
                                     )}
                                     <button
-                                      type='button'
+                                      type="button"
                                       ref={(el) => {
                                         if (el) filterFunnelRefs.current[column.field] = el;
                                         else delete filterFunnelRefs.current[column.field];
                                       }}
-                                      className={["header-filter-funnel", filterPopoverField === column.field ? "header-filter-funnel--open" : "", setSummary.isActive ? "header-filter-funnel--active" : ""].filter(Boolean).join(" ")}
+                                      className={['header-filter-funnel', filterPopoverField === column.field ? 'header-filter-funnel--open' : '', setSummary.isActive ? 'header-filter-funnel--active' : ''].filter(Boolean).join(' ')}
                                       aria-label={`Filter options for ${column.label}`}
                                       aria-expanded={filterPopoverField === column.field}
                                       onClick={(e) => {
@@ -615,31 +580,31 @@ export const TreeDataGrid = ({
                                       }}
                                     >
                                       <FilterFunnelIcon />
-                                      {setSummary.isActive ? <span className='header-filter-funnel-badge' aria-hidden /> : null}
+                                      {setSummary.isActive ? <span className="header-filter-funnel-badge" aria-hidden /> : null}
                                     </button>
                                   </div>
                                 );
                               })()
                             ) : (
-                              <span className='header-filter-spacer' aria-hidden />
+                              <span className="header-filter-spacer" aria-hidden />
                             )}
                           </div>
                         </div>
                       ) : (
-                        <div className='header-cell header-cell--title-row'>
-                          <button type='button' className='header-button' onClick={() => handleSort(column.field)}>
+                        <div className="header-cell header-cell--title-row">
+                          <button type="button" className="header-button" onClick={() => handleSort(column.field)}>
                             {column.label}
-                            {direction === "asc" && " \u2191"}
-                            {direction === "desc" && " \u2193"}
+                            {direction === 'asc' && ' \u2191'}
+                            {direction === 'desc' && ' \u2193'}
                           </button>
                           {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
                             ⋮
                           </button> */}
-                          <div className='pin-actions' role='group' aria-label={`${column.label} pinning`}>
-                            <button type='button' className={`pin-button${pin === "left" ? " active" : ""}`} aria-pressed={pin === "left"} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === "left" ? null : "left")}>
+                          <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
+                            <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
                               L
                             </button>
-                            <button type='button' className={`pin-button${pin === "right" ? " active" : ""}`} aria-pressed={pin === "right"} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === "right" ? null : "right")}>
+                            <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
                               R
                             </button>
                           </div>
@@ -651,28 +616,21 @@ export const TreeDataGrid = ({
                 })}
               </div>
             </div>
-            <div className='tree-data-grid-body' role='rowgroup'>
+            <div className="tree-data-grid-body" role="rowgroup">
               {flattenedRows.map((row, rowIndex) => {
                 const rid = row[treeRowIdField];
-                const subtreeIds =
-                  groupSelection === "descendants" && (childrenMap.get(rid)?.length ?? 0) > 0 ? collectSubtreeIds(rid, childrenMap) : [rid];
+                const subtreeIds = groupSelection === 'descendants' && (childrenMap.get(rid)?.length ?? 0) > 0 ? collectSubtreeIds(rid, childrenMap) : [rid];
                 const selectedInSubtree = subtreeIds.filter((id) => selectedSet.has(id)).length;
                 const checkboxChecked = selectedInSubtree === subtreeIds.length;
                 const checkboxIndeterminate = selectedInSubtree > 0 && selectedInSubtree < subtreeIds.length;
-                const rowHighlight = groupSelection === "descendants" ? selectedInSubtree > 0 : selectedSet.has(rid);
+                const rowHighlight = groupSelection === 'descendants' ? selectedInSubtree > 0 : selectedSet.has(rid);
                 const rowInner = (
-                  <div
-                    role='row'
-                    className={["tree-data-grid-row", rowHighlight ? "data-grid-row--selected" : "", enableClickSelection ? "data-grid-row--clickable" : ""].filter(Boolean).join(" ") || undefined}
-                    style={{ gridTemplateColumns: colTpl }}
-                    aria-selected={selectionEnabled ? rowHighlight : undefined}
-                    onClick={(event) => handleRowBackgroundClick(event, rid)}
-                  >
+                  <div role="row" className={['tree-data-grid-row', rowHighlight ? 'data-grid-row--selected' : '', enableClickSelection ? 'data-grid-row--clickable' : ''].filter(Boolean).join(' ') || undefined} style={{ gridTemplateColumns: colTpl }} aria-selected={selectionEnabled ? rowHighlight : undefined} onClick={(event) => handleRowBackgroundClick(event, rid)}>
                     {showLeadingSelect ? (
-                      <div className='tree-grid-cell tree-grid-cell--select' role='gridcell' data-field='__select__' data-no-row-select>
+                      <div className="tree-grid-cell tree-grid-cell--select" role="gridcell" data-field="__select__" data-no-row-select>
                         <input
-                          className='grid-checkbox'
-                          type='checkbox'
+                          className="grid-checkbox"
+                          type="checkbox"
                           checked={checkboxChecked}
                           ref={(el) => {
                             if (el) el.indeterminate = checkboxIndeterminate;
@@ -687,32 +645,32 @@ export const TreeDataGrid = ({
                       const cellInner = renderCell(row, column);
                       const treeWrap = column.field === treeExpandColumnField;
                       return (
-                        <div key={`${row.id}-${column.field}`} role='gridcell' className='tree-grid-cell' style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
+                        <div key={`${row.id}-${column.field}`} role="gridcell" className="tree-grid-cell" style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
                           {treeWrap ? (
-                            <div className='tree-cell' style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div className="tree-cell" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span style={{ width: (row.__treeDepth ?? 0) * treeIndentPerLevel, flexShrink: 0 }} aria-hidden />
                               {row.__treeHasChildren ? (
                                 <button
-                                  type='button'
-                                  className='tree-toggle'
+                                  type="button"
+                                  className="tree-toggle"
                                   data-no-row-select
                                   aria-expanded={row.__treeExpanded}
-                                  aria-label={row.__treeExpanded ? "Collapse" : "Expand"}
+                                  aria-label={row.__treeExpanded ? 'Collapse' : 'Expand'}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     toggleTreeExpand(row[treeRowIdField]);
                                   }}
                                 >
-                                  <span className='tree-toggle-icon' aria-hidden>
-                                    <svg viewBox='0 0 24 24' width='16' height='16' fill='currentColor' focusable='false'>
-                                      <path d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z' />
+                                  <span className="tree-toggle-icon" aria-hidden>
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" focusable="false">
+                                      <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
                                     </svg>
                                   </span>
                                 </button>
                               ) : (
-                                <span className='tree-toggle-placeholder' aria-hidden style={{ width: 22, display: "inline-block", flexShrink: 0 }} />
+                                <span className="tree-toggle-placeholder" aria-hidden style={{ width: 22, display: 'inline-block', flexShrink: 0 }} />
                               )}
-                              <div className='tree-cell-body' style={{ flex: 1, minWidth: 0 }}>
+                              <div className="tree-cell-body" style={{ flex: 1, minWidth: 0 }}>
                                 {cellInner}
                               </div>
                             </div>
@@ -729,13 +687,8 @@ export const TreeDataGrid = ({
                 const suppressOpenAnim = openAnimSuppressedIds.has(row[treeRowIdField]);
 
                 return (
-                  <div
-                    key={rid}
-                    className={["tree-row-height-anim", animateRows && !isClosingRow && !suppressOpenAnim && "tree-row-height-anim--animate", animateRows && isClosingRow && "tree-row-height-anim--animate-out"].filter(Boolean).join(" ") || undefined}
-                    {...(hasSplit ? { "data-sync-row-index": rowIndex } : {})}
-                    style={{ "--tree-row-stagger": rowIndex }}
-                  >
-                    <div className='tree-row-height-anim__clip'>{rowInner}</div>
+                  <div key={rid} className={['tree-row-height-anim', animateRows && !isClosingRow && !suppressOpenAnim && 'tree-row-height-anim--animate', animateRows && isClosingRow && 'tree-row-height-anim--animate-out'].filter(Boolean).join(' ') || undefined} {...(hasSplit ? { 'data-sync-row-index': rowIndex } : {})} style={{ '--tree-row-stagger': rowIndex }}>
+                    <div className="tree-row-height-anim__clip">{rowInner}</div>
                   </div>
                 );
               })}
@@ -747,49 +700,39 @@ export const TreeDataGrid = ({
   };
 
   return (
-    <div className='grid-container' ref={gridMeasureRootRef}>
-      {showSelectColumn && rs.mode === "multi" && treeDataConfig.showGroupSelectionControl !== false ? (
-        <div className='tree-grid-group-selection-toolbar'>
-          <label className='tree-grid-group-selection-label'>
+    <div className="grid-container" ref={gridMeasureRootRef}>
+      {showSelectColumn && rs.mode === 'multi' && treeDataConfig.showGroupSelectionControl !== false ? (
+        <div className="tree-grid-group-selection-toolbar">
+          <label className="tree-grid-group-selection-label">
             Group selects:
-            <select aria-label='Group selection mode' value={groupSelection} onChange={(e) => setGroupSelection(e.target.value)}>
-              <option value='self'>self</option>
-              <option value='descendants'>descendants</option>
+            <select aria-label="Group selection mode" value={groupSelection} onChange={(e) => setGroupSelection(e.target.value)}>
+              <option value="self">self</option>
+              <option value="descendants">descendants</option>
             </select>
           </label>
         </div>
       ) : null}
-      {error && <p className='status error'>{error}</p>}
-      {editError && <p className='status error'>{editError}</p>}
-      {!loading && !hasRows && <p className='status'>No rows found.</p>}
+      {error && <p className="status error">{error}</p>}
+      {editError && <p className="status error">{editError}</p>}
+      {!loading && !hasRows && <p className="status">No rows found.</p>}
 
-      <div className={`grid-split-root${hasSplit ? " grid-split-root--split" : ""}`}>
+      <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
         {loading ? (
-          <div className='grid-loading-overlay' role='status' aria-live='polite'>
-            <div className='grid-loading-chip'>
-              <span className='grid-loading-spinner' aria-hidden />
+          <div className="grid-loading-overlay" role="status" aria-live="polite">
+            <div className="grid-loading-chip">
+              <span className="grid-loading-spinner" aria-hidden />
               <span>Loading...</span>
             </div>
           </div>
         ) : null}
-        <div className='grid-split-row' ref={gridSplitRowRef}>
-          {renderSectionGrid(leftColumns, "left")}
-          {renderSectionGrid(centerColumns, "center")}
-          {renderSectionGrid(rightColumns, "right")}
+        <div className="grid-split-row" ref={gridSplitRowRef}>
+          {renderSectionGrid(leftColumns, 'left')}
+          {renderSectionGrid(centerColumns, 'center')}
+          {renderSectionGrid(rightColumns, 'right')}
         </div>
       </div>
 
-      {filterPopoverField ? (
-        <ColumnFilterPopover
-          isOpen
-          onClose={closeFilterPopover}
-          anchorEl={filterFunnelRefs.current[filterPopoverField]}
-          label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField}
-          distinctValues={distinctByField[filterPopoverField] ?? []}
-          selectedValues={filterDraft[filterPopoverField]?.inValues ?? []}
-          onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)}
-        />
-      ) : null}
+      {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterDraft[filterPopoverField]?.inValues ?? []} onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)} /> : null}
     </div>
   );
 };

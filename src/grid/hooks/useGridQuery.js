@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { DEFAULT_QUERY_STATE } from "../utils/query";
+import { useCallback, useMemo, useState } from 'react';
+import { DEFAULT_QUERY_STATE } from '../utils/query';
 
 export const useGridQuery = (initialState = {}) => {
   const [queryState, setQueryState] = useState({ ...DEFAULT_QUERY_STATE, ...initialState });
@@ -12,10 +12,10 @@ export const useGridQuery = (initialState = {}) => {
 
   const setSort = useCallback((sortField, sortDirection) => setQueryState((previous) => ({ ...previous, sortField, sortDirection, page: 1 })), []);
 
-  const setFilter = useCallback((field, value, operator = "contains") => {
+  const setFilter = useCallback((field, value, operator = 'contains') => {
     setQueryState((previous) => {
       const nextFilters = { ...previous.filters };
-      if (value === "" || value == null) delete nextFilters[field];
+      if (value === '' || value == null) delete nextFilters[field];
       else nextFilters[field] = { value, operator };
 
       return { ...previous, filters: nextFilters, page: 1 };

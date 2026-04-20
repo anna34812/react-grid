@@ -1,6 +1,6 @@
 export const getColumnMinWidth = (column) => {
-  if (typeof column.width === "number") return column.width;
-  if (typeof column.minWidth === "number") return column.minWidth;
+  if (typeof column.width === 'number') return column.width;
+  if (typeof column.minWidth === 'number') return column.minWidth;
   return 140;
 };
 
@@ -17,7 +17,7 @@ export const getColumnSections = (columns, pinnedOverrides) => {
   const pin = (item) => getEffectivePin(item.column, pinnedOverrides);
 
   const left = enriched
-    .filter((item) => pin(item) === "left")
+    .filter((item) => pin(item) === 'left')
     .sort((a, b) => a.originalIndex - b.originalIndex)
     .map((item) => item.column);
   const center = enriched
@@ -25,7 +25,7 @@ export const getColumnSections = (columns, pinnedOverrides) => {
     .sort((a, b) => a.originalIndex - b.originalIndex)
     .map((item) => item.column);
   const right = enriched
-    .filter((item) => pin(item) === "right")
+    .filter((item) => pin(item) === 'right')
     .sort((a, b) => a.originalIndex - b.originalIndex)
     .map((item) => item.column);
 

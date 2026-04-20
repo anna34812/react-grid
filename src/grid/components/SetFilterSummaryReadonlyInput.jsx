@@ -1,18 +1,18 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { fitSetFilterDisplayText } from "../utils/setFilterDisplayText";
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { fitSetFilterDisplayText } from '../utils/setFilterDisplayText';
 
-const canvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
-const canvasCtx = canvas?.getContext("2d");
+const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+const canvasCtx = canvas?.getContext('2d');
 
 export const SetFilterSummaryReadonlyInput = ({ count, values, columnLabel, className, placeholder, onClick }) => {
   const inputRef = useRef(null);
   const valuesRef = useRef(values);
   valuesRef.current = values;
-  const valuesKey = values.join("\0");
+  const valuesKey = values.join('\0');
 
   const [text, setText] = useState(() => {
     if (!values.length) return `(${count})`;
-    const head = values.slice(0, 2).join(", ");
+    const head = values.slice(0, 2).join(', ');
     return values.length > 2 ? `(${count}) ${head}, ...` : `(${count}) ${head}`;
   });
 
@@ -53,5 +53,5 @@ export const SetFilterSummaryReadonlyInput = ({ count, values, columnLabel, clas
     return () => ro.disconnect();
   }, [recompute]);
 
-  return <input ref={inputRef} type='text' className={className} placeholder={placeholder} readOnly aria-readOnly aria-label={`${columnLabel} filter: ${count} values selected`} value={text} onChange={() => {}} onClick={onClick} />;
+  return <input ref={inputRef} type="text" className={className} placeholder={placeholder} readOnly aria-readOnly aria-label={`${columnLabel} filter: ${count} values selected`} value={text} onChange={() => {}} onClick={onClick} />;
 };

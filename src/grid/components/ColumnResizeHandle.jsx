@@ -7,10 +7,10 @@ export function ColumnResizeHandle({ column, enabled, onResizeStart, onAutoFit }
 
   return (
     <span
-      role='separator'
-      aria-orientation='vertical'
+      role="separator"
+      aria-orientation="vertical"
       aria-label={`Resize ${column.label}. Double-click to fit content.`}
-      className='column-resize-handle'
+      className="column-resize-handle"
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();

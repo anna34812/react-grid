@@ -1,7 +1,7 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getColumnMinWidth } from "../utils/columnPinning";
-import { measureColumnContentWidth, measureColumnHeaderContentWidth } from "../utils/gridColumnMeasure";
-import { COLUMN_SIZE_MODE } from "../utils/gridTemplateColumns";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { getColumnMinWidth } from '../utils/columnPinning';
+import { measureColumnContentWidth, measureColumnHeaderContentWidth } from '../utils/gridColumnMeasure';
+import { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
 const DRAG_THRESHOLD_PX = 3;
 
@@ -18,13 +18,7 @@ const DRAG_THRESHOLD_PX = 3;
  *   enableFiltering?: boolean;
  * }} [options]
  */
-export function useGridColumnResize({
-  enabled = true,
-  columns = [],
-  columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA,
-  measureRootRef = null,
-  enableFiltering = true,
-} = {}) {
+export function useGridColumnResize({ enabled = true, columns = [], columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA, measureRootRef = null, enableFiltering = true } = {}) {
   const [columnWidths, setColumnWidths] = useState({});
   const [resizing, setResizing] = useState(null);
   const widthsRef = useRef(columnWidths);
@@ -33,7 +27,7 @@ export function useGridColumnResize({
   /** Fields the user has resized or auto-fitted — do not overwrite with header measure. */
   const userSizedFieldsRef = useRef(new Set());
 
-  const columnsKey = useMemo(() => columns.map((c) => c.field).join("|"), [columns]);
+  const columnsKey = useMemo(() => columns.map((c) => c.field).join('|'), [columns]);
 
   useLayoutEffect(() => {
     const root = measureRootRef?.current;
@@ -69,7 +63,7 @@ export function useGridColumnResize({
           if (Math.abs(e.clientX - clientX) < DRAG_THRESHOLD_PX) return;
           started = true;
           setResizing({ field, startX: clientX, startWidth, minW });
-          document.body.style.cursor = "col-resize";
+          document.body.style.cursor = 'col-resize';
         }
         const delta = e.clientX - clientX;
         const next = Math.round(Math.max(minW, startWidth + delta));
@@ -80,17 +74,17 @@ export function useGridColumnResize({
       };
 
       const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
         setResizing(null);
         if (started) userSizedFieldsRef.current.add(field);
       };
 
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     },
     [enabled],
   );
@@ -98,7 +92,7 @@ export function useGridColumnResize({
   const autoFitColumn = useCallback(
     (column, event) => {
       if (!enabled) return;
-      const root = event.currentTarget.closest(".data-grid, .tree-data-grid");
+      const root = event.currentTarget.closest('.data-grid, .tree-data-grid');
       if (!root) return;
       const minW = getColumnMinWidth(column);
       const field = column.field;
@@ -110,4 +104,4 @@ export function useGridColumnResize({
   );
 
   return { columnWidths, startResize, autoFitColumn, resizingField: resizing?.field ?? null };
-};
+}

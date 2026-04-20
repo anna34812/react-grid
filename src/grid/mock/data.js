@@ -1,4 +1,4 @@
-const STATUSES = ["active", "pending", "disabled"];
+const STATUSES = ['active', 'pending', 'disabled'];
 
 export const generateRows = (size = 1000) =>
   Array.from({ length: size }, (_, index) => {

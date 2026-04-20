@@ -1,15 +1,15 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from 'react';
 
 const PRESETS = {
   dataGrid: {
-    headerSelector: ".data-grid-header-row[data-sync-header]",
+    headerSelector: '.data-grid-header-row[data-sync-header]',
     rowIndexSelector: (i) => `.data-grid-row[data-sync-row-index="${i}"]`,
-    gridRoot: ".data-grid",
+    gridRoot: '.data-grid',
   },
   tree: {
-    headerSelector: ".tree-data-grid-header-row[data-tree-sync-header]",
+    headerSelector: '.tree-data-grid-header-row[data-tree-sync-header]',
     rowIndexSelector: (i) => `.tree-row-height-anim[data-sync-row-index="${i}"]`,
-    gridRoot: ".tree-data-grid",
+    gridRoot: '.tree-data-grid',
   },
 };
 
@@ -27,13 +27,13 @@ export function useGridSplitSync({ hasSplit, rowCount, variant }) {
     if (!preset) return;
 
     const rootEl = gridSplitRowRef.current;
-    if (!rootEl || typeof ResizeObserver === "undefined") return;
+    if (!rootEl || typeof ResizeObserver === 'undefined') return;
 
     let rafId = 0;
     const syncSplitHeights = () => {
       const headerTrs = [...rootEl.querySelectorAll(preset.headerSelector)];
       if (headerTrs.length > 1) {
-        headerTrs.forEach((tr) => (tr.style.height = ""));
+        headerTrs.forEach((tr) => (tr.style.height = ''));
 
         const maxHeader = Math.max(0, ...headerTrs.map((tr) => tr.getBoundingClientRect().height));
         headerTrs.forEach((tr) => (tr.style.height = `${maxHeader}px`));
@@ -42,7 +42,7 @@ export function useGridSplitSync({ hasSplit, rowCount, variant }) {
       for (let i = 0; i < rowCount; i += 1) {
         const trs = [...rootEl.querySelectorAll(preset.rowIndexSelector(i))];
         if (trs.length <= 1) continue;
-        trs.forEach((tr) => (tr.style.height = ""));
+        trs.forEach((tr) => (tr.style.height = ''));
 
         const maxRow = Math.max(0, ...trs.map((tr) => tr.getBoundingClientRect().height));
         trs.forEach((tr) => (tr.style.height = `${maxRow}px`));
