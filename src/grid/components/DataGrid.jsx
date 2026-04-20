@@ -375,9 +375,12 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   const renderSectionGrid = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
+    const isInfiniteScrollPane = paginationMode === 'infinite' && pane === verticalScrollMasterPane;
     const setScrollRef = (node) => {
-      if (pane === 'center' && paginationMode === 'infinite') infiniteScrollRootRef.current = node;
       if (pane === 'left' || pane === 'right') paneScrollRefs.current[pane] = node;
+    };
+    const setBodyScrollRef = (node) => {
+      if (isInfiniteScrollPane) infiniteScrollRootRef.current = node;
     };
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
@@ -545,7 +548,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                 })}
               </div>
             </div>
-            <div className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
+            <div ref={setBodyScrollRef} className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
               <div className="data-grid-body" role="rowgroup">
                 {rows.map((row, rowIndex) => {
                   const rowSelected = selectedSet.has(row.id);
@@ -616,7 +619,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                   </div>
                 ) : null}
               </div>
-              {paginationMode === 'infinite' && pane === 'center' ? <div ref={infiniteSentinelRef} className="grid-infinite-sentinel" aria-hidden /> : null}
+              {isInfiniteScrollPane ? <div ref={infiniteSentinelRef} className="grid-infinite-sentinel" aria-hidden /> : null}
             </div>
           </div>
           {hasSplit && pane !== 'center' && !sidePaneHasRealX[pane] ? <div className="grid-pane-scroll-affordance" aria-hidden /> : null}
