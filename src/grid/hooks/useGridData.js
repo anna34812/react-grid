@@ -38,6 +38,7 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
   const dataGenerationRef = useRef(0);
   const nextPageRef = useRef(1);
   const loadMoreInFlightRef = useRef(false);
+  const loadedPagesRef = useRef(new Set());
 
   const requestQuery = useMemo(() => {
     const base = {
@@ -69,6 +70,7 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
     const generation = dataGenerationRef.current;
     let active = true;
     nextPageRef.current = 1;
+    loadedPagesRef.current = new Set();
 
     async function loadFirstPage() {
       setLoading(true);
@@ -91,6 +93,7 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
         const total = response.totalCount ?? 0;
         setSourceRows(chunk);
         setTotalCount(total);
+        loadedPagesRef.current = new Set([1]);
         nextPageRef.current = 2;
         setHasMore(chunk.length === queryState.pageSize && chunk.length < total);
       } catch (requestError) {
@@ -151,6 +154,10 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
     loadMoreInFlightRef.current = true;
     const generationAtStart = dataGenerationRef.current;
     const page = nextPageRef.current;
+    if (loadedPagesRef.current.has(page)) {
+      nextPageRef.current = page + 1;
+      return;
+    }
 
     setLoadingMore(true);
     setError('');
@@ -168,19 +175,25 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
 
       const chunk = response.rows ?? [];
       const total = response.totalCount ?? 0;
+      setTotalCount(total);
 
       if (chunk.length === 0) {
+        loadedPagesRef.current.add(page);
+        nextPageRef.current = page + 1;
         setHasMore(false);
         return;
       }
 
       let nextSnapshot;
       setSourceRows((prev) => {
-        nextSnapshot = [...prev, ...chunk];
+        const existingIds = new Set(prev.map((row) => row.id));
+        const uniqueChunk = chunk.filter((row) => !existingIds.has(row.id));
+        nextSnapshot = [...prev, ...uniqueChunk];
         return nextSnapshot;
       });
 
-      const stillMore = chunk.length === queryState.pageSize && nextSnapshot.length < total;
+      loadedPagesRef.current.add(page);
+      const stillMore = chunk.length === queryState.pageSize && page * queryState.pageSize < total;
       setHasMore(stillMore);
       nextPageRef.current = page + 1;
     } catch (requestError) {

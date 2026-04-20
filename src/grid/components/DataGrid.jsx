@@ -16,6 +16,7 @@ import { useGridSplitSync } from '../hooks/useGridSplitSync';
 import { useGridColumnResize } from '../hooks/useGridColumnResize';
 import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
+import { GridInfiniteFooter } from './GridInfiniteFooter';
 import { GridPagination } from './GridPagination';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
@@ -37,7 +38,7 @@ export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
  * measured header width (label, filters, pin actions), not only `column.minWidth`, until the user resizes or auto-fits a column.
  */
 export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
-  const INFINITE_LOADING_ROW_MIN_HEIGHT = 44;
+  const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
   const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
   const { rows, loading, loadingMore, hasMore, loadMore, error, setRows } = useGridData(queryState, setTotalCount, { paginationMode });
   const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
@@ -48,7 +49,8 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
   /** Scrollport for infinite load + layout fill; center pane’s `.grid-pane-scroll` only. */
   const infiniteScrollRootRef = useRef(null);
   const infiniteSentinelRef = useRef(null);
-  const [infiniteLoadingBarBottomPx, setInfiniteLoadingBarBottomPx] = useState(0);
+  const paneScrollRefs = useRef({ left: null, right: null });
+  const [sidePaneHasRealX, setSidePaneHasRealX] = useState({ left: false, right: false });
 
   const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder });
 
@@ -69,14 +71,58 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
   const { filterDraft, setFilterDraft, filterPopoverField, setFilterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: false });
 
   useGridEditFocus(editingCell);
+  const verticalScrollMasterPane = hasSplit && rightColumns.length > 0 ? 'right' : 'center';
 
-  const gridSplitRowRef = useGridSplitSync({
-    hasSplit,
-    rowCount: rows.length,
-    variant: 'dataGrid',
-  });
+  const gridSplitRowRef = useGridSplitSync({ hasSplit, rowCount: rows.length, variant: 'dataGrid' });
 
-  useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rows.length);
+  const splitScrollSyncKey = `${verticalScrollMasterPane}|${leftColumns.map((c) => c.field).join(',')}|${centerColumns.map((c) => c.field).join(',')}|${rightColumns.map((c) => c.field).join(',')}`;
+  useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rows.length, splitScrollSyncKey);
+
+  const updateSidePaneRealX = useCallback(() => {
+    if (!hasSplit) {
+      setSidePaneHasRealX((prev) => (prev.left || prev.right ? { left: false, right: false } : prev));
+      return;
+    }
+    const leftEl = paneScrollRefs.current.left;
+    const rightEl = paneScrollRefs.current.right;
+    const hasMeaningfulOverflow = (el) => el && el.scrollWidth - el.clientWidth > SIDE_X_OVERFLOW_THRESHOLD_PX;
+    setSidePaneHasRealX((prev) => {
+      const next = {
+        left: Boolean(hasMeaningfulOverflow(leftEl)),
+        right: Boolean(hasMeaningfulOverflow(rightEl)),
+      };
+      return prev.left === next.left && prev.right === next.right ? prev : next;
+    });
+  }, [hasSplit, SIDE_X_OVERFLOW_THRESHOLD_PX]);
+
+  useLayoutEffect(() => {
+    updateSidePaneRealX();
+    const rafId = requestAnimationFrame(updateSidePaneRealX);
+    return () => cancelAnimationFrame(rafId);
+  }, [updateSidePaneRealX, rows.length, leftColumns.length, centerColumns.length, rightColumns.length, columnSizeMode, columnWidths]);
+
+  useEffect(() => {
+    if (!hasSplit) return;
+
+    const trackedPanes = [
+      ['left', paneScrollRefs.current.left],
+      ['right', paneScrollRefs.current.right],
+    ].filter(([, el]) => Boolean(el));
+    if (trackedPanes.length === 0) return;
+    const trackedContent = trackedPanes.map(([, el]) => el.querySelector('.data-grid')).filter(Boolean);
+
+    updateSidePaneRealX();
+    const timeoutId = setTimeout(updateSidePaneRealX, 0);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(updateSidePaneRealX);
+    for (const [, el] of trackedPanes) ro.observe(el);
+    for (const el of trackedContent) ro.observe(el);
+    if (gridSplitRowRef.current) ro.observe(gridSplitRowRef.current);
+    return () => {
+      clearTimeout(timeoutId);
+      ro.disconnect();
+    };
+  }, [hasSplit, updateSidePaneRealX]);
 
   const handleRowDrop = useCallback(
     (event, targetRowId) => {
@@ -107,12 +153,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     const sentinel = infiniteSentinelRef.current;
     if (!root || !sentinel) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
-      },
-      { root, rootMargin: '160px', threshold: 0 },
-    );
+    const observer = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && void loadMore(), { root, rootMargin: '160px', threshold: 0 });
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [paginationMode, loadMore, rows.length]);
@@ -128,30 +169,13 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     if (sentRect.bottom <= rootRect.bottom + 8) void loadMore();
   }, [paginationMode, loading, loadingMore, hasMore, rows.length, loadMore]);
 
-  /** Unified loading bar above h-scrollbars: max `offsetHeight - clientHeight` across panes; ignore noise when no horizontal overflow. */
+  /** Keep the synthetic loading row visible (11th row position) while fetching next page. */
   useLayoutEffect(() => {
     if (paginationMode !== 'infinite' || !loadingMore) return;
-    const rowEl = gridSplitRowRef.current;
-    const center = infiniteScrollRootRef.current;
-    const roots = rowEl ? [...rowEl.querySelectorAll('.grid-pane-scroll')] : center ? [center] : [];
-    if (roots.length === 0) return;
-
-    const measure = () => {
-      let maxBar = 0;
-      for (const el of roots) {
-        let d = el.offsetHeight - el.clientHeight;
-        const hasHorizontalOverflow = el.scrollWidth > el.clientWidth + 1;
-        if (!hasHorizontalOverflow && d <= 3) d = 0;
-        maxBar = Math.max(maxBar, d);
-      }
-      setInfiniteLoadingBarBottomPx(Math.max(0, Math.round(maxBar)));
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(measure);
-    for (const el of roots) ro.observe(el);
-    return () => ro.disconnect();
-  }, [paginationMode, loadingMore, rows.length, hasSplit]);
+    const root = infiniteScrollRootRef.current;
+    if (!root) return;
+    root.scrollTop = root.scrollHeight;
+  }, [paginationMode, loadingMore, rows.length]);
 
   const handleSort = (field) => {
     const direction = nextSortDirection(queryState.sortField, queryState.sortDirection, field);
@@ -335,11 +359,8 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     const applied = queryState.filters[field];
 
     let values = null;
-    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) {
-      values = draft.inValues.map(String);
-    } else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) {
-      values = applied.value.map(String);
-    }
+    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) values = draft.inValues.map(String);
+    else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) values = applied.value.map(String);
 
     if (!values || values.length === 0) return { isActive: false };
 
@@ -354,6 +375,10 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   const renderSectionGrid = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
+    const setScrollRef = (node) => {
+      if (pane === 'center' && paginationMode === 'infinite') infiniteScrollRootRef.current = node;
+      if (pane === 'left' || pane === 'right') paneScrollRefs.current[pane] = node;
+    };
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
@@ -362,7 +387,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
-        <div ref={paginationMode === 'infinite' && pane === 'center' ? infiniteScrollRootRef : undefined} className={hasSplit ? 'grid-pane-scroll grid-pane-scroll--pinned' : 'grid-pane-scroll'} data-hscroll={hasSplit ? 'always' : 'auto'}>
+        <div ref={setScrollRef} className={[hasSplit ? 'grid-pane-scroll grid-pane-scroll--pinned' : 'grid-pane-scroll', hasSplit && pane !== 'center' && sidePaneHasRealX[pane] ? 'grid-pane-scroll--has-real-x' : ''].filter(Boolean).join(' ')} data-hscroll={hasSplit ? 'always' : 'auto'}>
           <div className={['data-grid', resizingField ? 'data-grid--column-resizing' : ''].filter(Boolean).join(' ') || undefined} data-column-size-mode={columnSizeMode} role="grid" aria-rowcount={rows.length} aria-colcount={ariaColCount}>
             <div className="data-grid-header" role="presentation">
               <div className="data-grid-header-row" role="row" {...(hasSplit ? { 'data-sync-header': '' } : {})} style={{ gridTemplateColumns: colTpl }}>
@@ -520,64 +545,81 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                 })}
               </div>
             </div>
-            <div className="data-grid-body" role="rowgroup">
-              {rows.map((row, rowIndex) => {
-                const rowSelected = selectedSet.has(row.id);
-                const rowDragOver = enableRowDrag && dragOverRowId === row.id;
-                return (
-                  <div
-                    key={row.id}
-                    role="row"
-                    {...(hasSplit ? { 'data-sync-row-index': rowIndex } : {})}
-                    className={['data-grid-row', rowSelected ? 'data-grid-row--selected' : '', enableClickSelection ? 'data-grid-row--clickable' : '', rowDragOver ? 'data-grid-row--drag-over' : ''].filter(Boolean).join(' ') || undefined}
-                    style={{ gridTemplateColumns: colTpl }}
-                    aria-selected={selectionEnabled ? rowSelected : undefined}
-                    onClick={(event) => handleRowBackgroundClick(event, row.id)}
-                    onDragOverCapture={
-                      enableRowDrag
-                        ? (e) => {
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = 'move';
-                            setDragOverRowId(row.id);
-                          }
-                        : undefined
-                    }
-                    onDragLeave={enableRowDrag ? (e) => !e.currentTarget.contains(e.relatedTarget) && setDragOverRowId(null) : undefined}
-                    onDropCapture={enableRowDrag ? (e) => handleRowDrop(e, row.id) : undefined}
-                  >
-                    {showLeadingRowDrag ? (
-                      <div role="gridcell" className="data-grid-cell grid-row-drag-cell" data-field="__rowDrag__" data-no-row-select>
-                        <button
-                          type="button"
-                          className="row-drag-handle"
-                          draggable
-                          aria-label={`Reorder row ${row.id}`}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('application/x-data-grid-row-id', String(row.id));
-                            e.dataTransfer.effectAllowed = 'move';
-                          }}
-                          onDragEnd={() => setDragOverRowId(null)}
-                        >
-                          ⠿
-                        </button>
-                      </div>
-                    ) : null}
-                    {showLeadingSelect ? (
-                      <div role="gridcell" className="data-grid-cell grid-select-cell" data-field="__select__" data-no-row-select>
-                        <input className="grid-checkbox" type="checkbox" checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
-                      </div>
-                    ) : null}
-                    {sectionColumns.map((column) => (
-                      <div key={`${row.id}-${column.field}`} role="gridcell" className="data-grid-cell" style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
-                        {renderCell(row, column)}
-                      </div>
-                    ))}
+            <div className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
+              <div className="data-grid-body" role="rowgroup">
+                {rows.map((row, rowIndex) => {
+                  const rowSelected = selectedSet.has(row.id);
+                  const rowDragOver = enableRowDrag && dragOverRowId === row.id;
+                  return (
+                    <div
+                      key={row.id}
+                      role="row"
+                      {...(hasSplit ? { 'data-sync-row-index': rowIndex } : {})}
+                      className={['data-grid-row', rowSelected ? 'data-grid-row--selected' : '', enableClickSelection ? 'data-grid-row--clickable' : '', rowDragOver ? 'data-grid-row--drag-over' : ''].filter(Boolean).join(' ') || undefined}
+                      style={{ gridTemplateColumns: colTpl }}
+                      aria-selected={selectionEnabled ? rowSelected : undefined}
+                      onClick={(event) => handleRowBackgroundClick(event, row.id)}
+                      onDragOverCapture={
+                        enableRowDrag
+                          ? (e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              setDragOverRowId(row.id);
+                            }
+                          : undefined
+                      }
+                      onDragLeave={enableRowDrag ? (e) => !e.currentTarget.contains(e.relatedTarget) && setDragOverRowId(null) : undefined}
+                      onDropCapture={enableRowDrag ? (e) => handleRowDrop(e, row.id) : undefined}
+                    >
+                      {showLeadingRowDrag ? (
+                        <div role="gridcell" className="data-grid-cell grid-row-drag-cell" data-field="__rowDrag__" data-no-row-select>
+                          <button
+                            type="button"
+                            className="row-drag-handle"
+                            draggable
+                            aria-label={`Reorder row ${row.id}`}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/x-data-grid-row-id', String(row.id));
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onDragEnd={() => setDragOverRowId(null)}
+                          >
+                            ⠿
+                          </button>
+                        </div>
+                      ) : null}
+                      {showLeadingSelect ? (
+                        <div role="gridcell" className="data-grid-cell grid-select-cell" data-field="__select__" data-no-row-select>
+                          <input className="grid-checkbox" type="checkbox" checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
+                        </div>
+                      ) : null}
+                      {sectionColumns.map((column) => (
+                        <div key={`${row.id}-${column.field}`} role="gridcell" className="data-grid-cell" style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
+                          {renderCell(row, column)}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                {paginationMode === 'infinite' && loadingMore ? (
+                  <div role="row" className="data-grid-row data-grid-row--loading" style={{ gridTemplateColumns: colTpl }}>
+                    <div role="gridcell" className={`data-grid-cell data-grid-cell--loading ${pane === 'center' ? 'data-grid-cell--loading-primary' : 'data-grid-cell--loading-peer'}`} style={{ gridColumn: '1 / -1' }} aria-hidden={pane === 'center' ? undefined : true}>
+                      {pane === 'center' ? (
+                        <>
+                          <span className="grid-loading-spinner" aria-hidden />
+                          <span className="grid-infinite-loading-row__text">One moment please…</span>
+                        </>
+                      ) : (
+                        <span className="grid-infinite-loading-row__peer-fill" aria-hidden />
+                      )}
+                    </div>
                   </div>
-                );
-              })}
+                ) : null}
+              </div>
+              {paginationMode === 'infinite' && pane === 'center' ? <div ref={infiniteSentinelRef} className="grid-infinite-sentinel" aria-hidden /> : null}
             </div>
           </div>
-          {paginationMode === 'infinite' && pane === 'center' ? <div ref={infiniteSentinelRef} className="grid-infinite-sentinel" aria-hidden /> : null}
+          {hasSplit && pane !== 'center' && !sidePaneHasRealX[pane] ? <div className="grid-pane-scroll-affordance" aria-hidden /> : null}
         </div>
       </div>
     );
@@ -585,11 +627,11 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   return (
     <div className="grid-container" ref={gridMeasureRootRef}>
-      {error && <p className="status error">{error}</p>}
-      {editError && <p className="status error">{editError}</p>}
+      {/* {error && <p className="status error">{error}</p>}
+      {editError && <p className="status error">{editError}</p>} */}
       {!loading && !hasRows && <p className="status">No rows found.</p>}
 
-      <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}${paginationMode === 'infinite' && loadingMore ? ' grid-split-root--infinite-loading' : ''}`} style={paginationMode === 'infinite' && loadingMore ? { '--grid-hscroll-reserve': `${infiniteLoadingBarBottomPx}px`, '--grid-infinite-loading-reserve': `${INFINITE_LOADING_ROW_MIN_HEIGHT}px` } : undefined}>
+      <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
         {loading ? (
           <div className="grid-loading-overlay" role="status" aria-live="polite">
             <div className="grid-loading-chip">
@@ -603,15 +645,10 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
           {renderSectionGrid(centerColumns, 'center')}
           {renderSectionGrid(rightColumns, 'right')}
         </div>
-        {paginationMode === 'infinite' && loadingMore ? (
-          <div className="grid-infinite-loading-row grid-infinite-loading-row--unified" role="status" aria-live="polite">
-            <span className="grid-loading-spinner" aria-hidden />
-            <span className="grid-infinite-loading-row__text">One moment please…</span>
-          </div>
-        ) : null}
       </div>
 
       {paginationMode === 'server' || paginationMode === 'client' ? <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} /> : null}
+      {paginationMode === 'infinite' ? <GridInfiniteFooter pageSize={queryState.pageSize} totalCount={queryState.totalCount} loadedCount={rows.length} onPageSizeChange={setPageSize} loadingMore={loadingMore} hasMore={hasMore} /> : null}
 
       {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterDraft[filterPopoverField]?.inValues ?? []} onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)} /> : null}
     </div>

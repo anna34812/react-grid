@@ -1,45 +1,61 @@
 import { useEffect } from 'react';
 
 /**
- * Pinned split: show a single vertical scrollbar on the center pane only.
- * Side panes keep overflow-y hidden but stay aligned via scrollTop; wheel over pinned columns scrolls the center.
+ * Pinned split: show a single vertical scrollbar on one master pane.
+ * Prefer right pane (so the bar is on the far-right edge), fallback to center.
+ * Other panes keep overflow-y hidden but stay aligned via scrollTop.
  */
-export function useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rowCount) {
+export function useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rowCount, syncKey = '') {
   useEffect(() => {
     if (!hasSplit) return;
     const rowEl = gridSplitRowRef.current;
     if (!rowEl) return;
 
-    const center = rowEl.querySelector('.grid-pane--center .grid-pane-scroll');
-    const peers = [...rowEl.querySelectorAll('.grid-pane:not(.grid-pane--center) .grid-pane-scroll')];
-    if (!center || peers.length === 0) return;
+    const master =
+      rowEl.querySelector('.grid-pane-body-scroll.grid-pane-scroll--y-master') ??
+      rowEl.querySelector('.grid-pane--center .grid-pane-body-scroll') ??
+      rowEl.querySelector('.grid-pane-scroll.grid-pane-scroll--y-master') ??
+      rowEl.querySelector('.grid-pane--center .grid-pane-scroll');
+    const allScrollPanes = [...rowEl.querySelectorAll('.grid-pane .grid-pane-body-scroll')];
+    const effectiveScrollPanes = allScrollPanes.length > 0 ? allScrollPanes : [...rowEl.querySelectorAll('.grid-pane .grid-pane-scroll')];
+    if (!master || effectiveScrollPanes.length <= 1) return;
+    const peers = effectiveScrollPanes.filter((pane) => pane !== master);
 
     let locked = false;
-    const syncPeersFromCenter = () => {
+    const syncAllFrom = (source) => {
       if (locked) return;
       locked = true;
-      const top = center.scrollTop;
-      for (const p of peers) {
-        if (p.scrollTop !== top) p.scrollTop = top;
+      const top = source.scrollTop;
+      for (const pane of effectiveScrollPanes) {
+        if (pane === source) continue;
+        if (pane.scrollTop !== top) pane.scrollTop = top;
       }
       locked = false;
     };
 
-    center.addEventListener('scroll', syncPeersFromCenter, { passive: true });
-
-    const onWheelSides = (e) => {
-      e.preventDefault();
-      center.scrollTop += e.deltaY;
-    };
-    for (const p of peers) {
-      p.addEventListener('wheel', onWheelSides, { passive: false });
+    const onScrollByPane = new Map();
+    for (const pane of effectiveScrollPanes) {
+      const onScroll = () => syncAllFrom(pane);
+      onScrollByPane.set(pane, onScroll);
+      pane.addEventListener('scroll', onScroll, { passive: true });
     }
 
-    return () => {
-      center.removeEventListener('scroll', syncPeersFromCenter);
-      for (const p of peers) {
-        p.removeEventListener('wheel', onWheelSides);
-      }
+    const onWheelPeers = (e) => {
+      e.preventDefault();
+      master.scrollTop += e.deltaY;
     };
-  }, [gridSplitRowRef, hasSplit, rowCount]);
+    for (const p of peers) {
+      p.addEventListener('wheel', onWheelPeers, { passive: false });
+    }
+
+    syncAllFrom(master);
+
+    return () => {
+      for (const pane of effectiveScrollPanes) {
+        const onScroll = onScrollByPane.get(pane);
+        if (onScroll) pane.removeEventListener('scroll', onScroll);
+      }
+      for (const p of peers) p.removeEventListener('wheel', onWheelPeers);
+    };
+  }, [gridSplitRowRef, hasSplit, rowCount, syncKey]);
 }

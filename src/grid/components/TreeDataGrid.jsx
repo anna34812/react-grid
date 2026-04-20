@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useGridQuery } from '../hooks/useGridQuery';
 import { useGridData } from '../hooks/useGridData';
 import { useInlineEdit } from '../hooks/useInlineEdit';
@@ -36,6 +36,7 @@ const TREE_ROW_STAGGER_MS = 32;
  * `columnSizeMode`: same as DataGrid (`fitData`, `fitDataStretchLast`, `fitWidth`).
  */
 export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
+  const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
   const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
@@ -59,6 +60,8 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   const editedRowsRef = useRef(new Map());
   const [customSavingCell, setCustomSavingCell] = useState(null);
   const gridMeasureRootRef = useRef(null);
+  const paneScrollRefs = useRef({ left: null, right: null });
+  const [sidePaneHasRealX, setSidePaneHasRealX] = useState({ left: false, right: false });
 
   const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({
     columns,
@@ -257,10 +260,57 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   const { filterDraft, setFilterDraft, filterPopoverField, setFilterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: true });
 
   useGridEditFocus(editingCell);
+  const verticalScrollMasterPane = hasSplit && rightColumns.length > 0 ? 'right' : 'center';
 
   const gridSplitRowRef = useGridSplitSync({ hasSplit, rowCount: flattenedRows.length, variant: 'tree' });
+  const splitScrollSyncKey = `${verticalScrollMasterPane}|${leftColumns.map((c) => c.field).join(',')}|${centerColumns.map((c) => c.field).join(',')}|${rightColumns.map((c) => c.field).join(',')}`;
+  useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, flattenedRows.length, splitScrollSyncKey);
 
-  useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, flattenedRows.length);
+  const updateSidePaneRealX = useCallback(() => {
+    if (!hasSplit) {
+      setSidePaneHasRealX((prev) => (prev.left || prev.right ? { left: false, right: false } : prev));
+      return;
+    }
+    const leftEl = paneScrollRefs.current.left;
+    const rightEl = paneScrollRefs.current.right;
+    const hasMeaningfulOverflow = (el) => el && el.scrollWidth - el.clientWidth > SIDE_X_OVERFLOW_THRESHOLD_PX;
+    setSidePaneHasRealX((prev) => {
+      const next = {
+        left: Boolean(hasMeaningfulOverflow(leftEl)),
+        right: Boolean(hasMeaningfulOverflow(rightEl)),
+      };
+      return prev.left === next.left && prev.right === next.right ? prev : next;
+    });
+  }, [hasSplit, SIDE_X_OVERFLOW_THRESHOLD_PX]);
+
+  useLayoutEffect(() => {
+    updateSidePaneRealX();
+    const rafId = requestAnimationFrame(updateSidePaneRealX);
+    return () => cancelAnimationFrame(rafId);
+  }, [updateSidePaneRealX, flattenedRows.length, leftColumns.length, centerColumns.length, rightColumns.length, columnSizeMode, columnWidths]);
+
+  useEffect(() => {
+    if (!hasSplit) return;
+
+    const trackedPanes = [
+      ['left', paneScrollRefs.current.left],
+      ['right', paneScrollRefs.current.right],
+    ].filter(([, el]) => Boolean(el));
+    if (trackedPanes.length === 0) return;
+    const trackedContent = trackedPanes.map(([, el]) => el.querySelector('.tree-data-grid')).filter(Boolean);
+
+    updateSidePaneRealX();
+    const timeoutId = setTimeout(updateSidePaneRealX, 0);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(updateSidePaneRealX);
+    for (const [, el] of trackedPanes) ro.observe(el);
+    for (const el of trackedContent) ro.observe(el);
+    if (gridSplitRowRef.current) ro.observe(gridSplitRowRef.current);
+    return () => {
+      clearTimeout(timeoutId);
+      ro.disconnect();
+    };
+  }, [hasSplit, updateSidePaneRealX]);
 
   const hasRows = flattenedRows.length > 0;
 
@@ -465,13 +515,16 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
   const renderSectionGrid = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
+    const setScrollRef = (node) => {
+      if (pane === 'left' || pane === 'right') paneScrollRefs.current[pane] = node;
+    };
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect, columnWidths, columnSizeMode });
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
-        <div className={hasSplit ? 'grid-pane-scroll grid-pane-scroll--pinned' : 'grid-pane-scroll'} data-hscroll={hasSplit ? 'always' : 'auto'}>
+        <div ref={setScrollRef} className={[hasSplit ? 'grid-pane-scroll grid-pane-scroll--pinned' : 'grid-pane-scroll', hasSplit && pane !== 'center' && sidePaneHasRealX[pane] ? 'grid-pane-scroll--has-real-x' : ''].filter(Boolean).join(' ')} data-hscroll={hasSplit ? 'always' : 'auto'}>
           <div className={['tree-data-grid', resizingField ? 'tree-data-grid--column-resizing' : ''].filter(Boolean).join(' ') || undefined} data-column-size-mode={columnSizeMode} role="grid" aria-rowcount={flattenedRows.length} aria-colcount={sectionColumns.length + (showLeadingSelect ? 1 : 0)}>
             <div className="tree-data-grid-header" role="rowgroup">
               <div className="tree-data-grid-header-row" role="row" {...(hasSplit ? { 'data-tree-sync-header': '' } : {})} style={{ gridTemplateColumns: colTpl }}>
@@ -616,84 +669,87 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                 })}
               </div>
             </div>
-            <div className="tree-data-grid-body" role="rowgroup">
-              {flattenedRows.map((row, rowIndex) => {
-                const rid = row[treeRowIdField];
-                const subtreeIds = groupSelection === 'descendants' && (childrenMap.get(rid)?.length ?? 0) > 0 ? collectSubtreeIds(rid, childrenMap) : [rid];
-                const selectedInSubtree = subtreeIds.filter((id) => selectedSet.has(id)).length;
-                const checkboxChecked = selectedInSubtree === subtreeIds.length;
-                const checkboxIndeterminate = selectedInSubtree > 0 && selectedInSubtree < subtreeIds.length;
-                const rowHighlight = groupSelection === 'descendants' ? selectedInSubtree > 0 : selectedSet.has(rid);
-                const rowInner = (
-                  <div role="row" className={['tree-data-grid-row', rowHighlight ? 'data-grid-row--selected' : '', enableClickSelection ? 'data-grid-row--clickable' : ''].filter(Boolean).join(' ') || undefined} style={{ gridTemplateColumns: colTpl }} aria-selected={selectionEnabled ? rowHighlight : undefined} onClick={(event) => handleRowBackgroundClick(event, rid)}>
-                    {showLeadingSelect ? (
-                      <div className="tree-grid-cell tree-grid-cell--select" role="gridcell" data-field="__select__" data-no-row-select>
-                        <input
-                          className="grid-checkbox"
-                          type="checkbox"
-                          checked={checkboxChecked}
-                          ref={(el) => {
-                            if (el) el.indeterminate = checkboxIndeterminate;
-                          }}
-                          onChange={() => toggleRowSelection(rid)}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select row ${String(rid)}`}
-                        />
-                      </div>
-                    ) : null}
-                    {sectionColumns.map((column) => {
-                      const cellInner = renderCell(row, column);
-                      const treeWrap = column.field === treeExpandColumnField;
-                      return (
-                        <div key={`${row.id}-${column.field}`} role="gridcell" className="tree-grid-cell" style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
-                          {treeWrap ? (
-                            <div className="tree-cell" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span style={{ width: (row.__treeDepth ?? 0) * treeIndentPerLevel, flexShrink: 0 }} aria-hidden />
-                              {row.__treeHasChildren ? (
-                                <button
-                                  type="button"
-                                  className="tree-toggle"
-                                  data-no-row-select
-                                  aria-expanded={row.__treeExpanded}
-                                  aria-label={row.__treeExpanded ? 'Collapse' : 'Expand'}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleTreeExpand(row[treeRowIdField]);
-                                  }}
-                                >
-                                  <span className="tree-toggle-icon" aria-hidden>
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" focusable="false">
-                                      <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-                                    </svg>
-                                  </span>
-                                </button>
-                              ) : (
-                                <span className="tree-toggle-placeholder" aria-hidden style={{ width: 22, display: 'inline-block', flexShrink: 0 }} />
-                              )}
-                              <div className="tree-cell-body" style={{ flex: 1, minWidth: 0 }}>
-                                {cellInner}
-                              </div>
-                            </div>
-                          ) : (
-                            cellInner
-                          )}
+            <div className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
+              <div className="tree-data-grid-body" role="rowgroup">
+                {flattenedRows.map((row, rowIndex) => {
+                  const rid = row[treeRowIdField];
+                  const subtreeIds = groupSelection === 'descendants' && (childrenMap.get(rid)?.length ?? 0) > 0 ? collectSubtreeIds(rid, childrenMap) : [rid];
+                  const selectedInSubtree = subtreeIds.filter((id) => selectedSet.has(id)).length;
+                  const checkboxChecked = selectedInSubtree === subtreeIds.length;
+                  const checkboxIndeterminate = selectedInSubtree > 0 && selectedInSubtree < subtreeIds.length;
+                  const rowHighlight = groupSelection === 'descendants' ? selectedInSubtree > 0 : selectedSet.has(rid);
+                  const rowInner = (
+                    <div role="row" className={['tree-data-grid-row', rowHighlight ? 'data-grid-row--selected' : '', enableClickSelection ? 'data-grid-row--clickable' : ''].filter(Boolean).join(' ') || undefined} style={{ gridTemplateColumns: colTpl }} aria-selected={selectionEnabled ? rowHighlight : undefined} onClick={(event) => handleRowBackgroundClick(event, rid)}>
+                      {showLeadingSelect ? (
+                        <div className="tree-grid-cell tree-grid-cell--select" role="gridcell" data-field="__select__" data-no-row-select>
+                          <input
+                            className="grid-checkbox"
+                            type="checkbox"
+                            checked={checkboxChecked}
+                            ref={(el) => {
+                              if (el) el.indeterminate = checkboxIndeterminate;
+                            }}
+                            onChange={() => toggleRowSelection(rid)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select row ${String(rid)}`}
+                          />
                         </div>
-                      );
-                    })}
-                  </div>
-                );
+                      ) : null}
+                      {sectionColumns.map((column) => {
+                        const cellInner = renderCell(row, column);
+                        const treeWrap = column.field === treeExpandColumnField;
+                        return (
+                          <div key={`${row.id}-${column.field}`} role="gridcell" className="tree-grid-cell" style={columnStyle(column)} data-field={column.field} data-pinned={getEffectivePin(column, pinnedOverrides) ?? undefined}>
+                            {treeWrap ? (
+                              <div className="tree-cell" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ width: (row.__treeDepth ?? 0) * treeIndentPerLevel, flexShrink: 0 }} aria-hidden />
+                                {row.__treeHasChildren ? (
+                                  <button
+                                    type="button"
+                                    className="tree-toggle"
+                                    data-no-row-select
+                                    aria-expanded={row.__treeExpanded}
+                                    aria-label={row.__treeExpanded ? 'Collapse' : 'Expand'}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleTreeExpand(row[treeRowIdField]);
+                                    }}
+                                  >
+                                    <span className="tree-toggle-icon" aria-hidden>
+                                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" focusable="false">
+                                        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                                      </svg>
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <span className="tree-toggle-placeholder" aria-hidden style={{ width: 22, display: 'inline-block', flexShrink: 0 }} />
+                                )}
+                                <div className="tree-cell-body" style={{ flex: 1, minWidth: 0 }}>
+                                  {cellInner}
+                                </div>
+                              </div>
+                            ) : (
+                              cellInner
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
 
-                const isClosingRow = pendingCollapseId != null && animateRows && isDescendantOf(row, pendingCollapseId);
-                const suppressOpenAnim = openAnimSuppressedIds.has(row[treeRowIdField]);
+                  const isClosingRow = pendingCollapseId != null && animateRows && isDescendantOf(row, pendingCollapseId);
+                  const suppressOpenAnim = openAnimSuppressedIds.has(row[treeRowIdField]);
 
-                return (
-                  <div key={rid} className={['tree-row-height-anim', animateRows && !isClosingRow && !suppressOpenAnim && 'tree-row-height-anim--animate', animateRows && isClosingRow && 'tree-row-height-anim--animate-out'].filter(Boolean).join(' ') || undefined} {...(hasSplit ? { 'data-sync-row-index': rowIndex } : {})} style={{ '--tree-row-stagger': rowIndex }}>
-                    <div className="tree-row-height-anim__clip">{rowInner}</div>
-                  </div>
-                );
-              })}
+                  return (
+                    <div key={rid} className={['tree-row-height-anim', animateRows && !isClosingRow && !suppressOpenAnim && 'tree-row-height-anim--animate', animateRows && isClosingRow && 'tree-row-height-anim--animate-out'].filter(Boolean).join(' ') || undefined} {...(hasSplit ? { 'data-sync-row-index': rowIndex } : {})} style={{ '--tree-row-stagger': rowIndex }}>
+                      <div className="tree-row-height-anim__clip">{rowInner}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
+          {hasSplit && pane !== 'center' && !sidePaneHasRealX[pane] ? <div className="grid-pane-scroll-affordance" aria-hidden /> : null}
         </div>
       </div>
     );

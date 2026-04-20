@@ -77,6 +77,8 @@
   flex-direction: column;
   min-width: max-content;
   width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .tree-data-grid-header {
@@ -269,7 +271,7 @@
   flex: 0 1 auto;
   max-width: min(55%, 520px);
   border-right: 1px solid #d1d5db;
-  box-shadow: 4px 0 10px -4px rgba(15, 23, 42, 0.12);
+  /* box-shadow: 4px 0 10px -4px rgba(15, 23, 42, 0.12); */
 }
 
 .grid-split-root--split .grid-pane--center {
@@ -281,7 +283,7 @@
   flex: 0 1 auto;
   max-width: min(55%, 520px);
   border-left: 1px solid #d1d5db;
-  box-shadow: -4px 0 10px -4px rgba(15, 23, 42, 0.12);
+  /* box-shadow: -4px 0 10px -4px rgba(15, 23, 42, 0.12); */
 }
 
 .grid-split-root:not(.grid-split-root--split) .grid-pane--center {
@@ -292,26 +294,58 @@
   display: flex;
   flex-direction: column;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: hidden;
   width: 100%;
-  max-height: min(70vh, 560px);
   min-height: 0;
 }
 
-/* Any column pinned: each pane always reserves horizontal scroll (ag-Grid–style). */
+/* Pinned panes: always keep scrollbar affordance visible. */
 .grid-pane-scroll--pinned {
   overflow-x: scroll;
-  scrollbar-gutter: stable;
 }
 
-/* Only the center pane shows a vertical scrollbar; left/right follow via scrollTop (see useGridSplitPaneScrollSync). */
-.grid-split-root--split .grid-pane:not(.grid-pane--center) .grid-pane-scroll {
-  overflow-y: hidden;
-}
-
-.grid-split-root--infinite-loading .grid-pane-scroll {
-  padding-bottom: var(--grid-infinite-loading-reserve);
+.grid-pane-scroll-affordance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 14px;
+  padding: 0 4px;
   box-sizing: border-box;
+  flex: 0 0 auto;
+  pointer-events: none;
+  color: #9ca3af;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.grid-pane-scroll-affordance::before {
+  content: '◀';
+}
+
+.grid-pane-scroll-affordance::after {
+  content: '▶';
+}
+
+/* Keep a single real horizontal scrollbar in center pane. */
+.grid-split-root--split .grid-pane:not(.grid-pane--center) .grid-pane-scroll {
+  overflow-x: hidden;
+}
+
+.grid-split-root--split .grid-pane:not(.grid-pane--center) .grid-pane-scroll.grid-pane-scroll--has-real-x {
+  overflow-x: auto;
+}
+
+.grid-pane-body-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: min(70vh, 560px);
+}
+
+/* Only the designated master pane shows vertical scrollbar; others follow via scrollTop sync. */
+.grid-split-root--split .grid-pane-body-scroll:not(.grid-pane-scroll--y-master) {
+  overflow-y: hidden;
 }
 
 /* DataGrid: div + CSS Grid (aligned with TreeDataGrid pane pattern) */
@@ -320,6 +354,8 @@
   flex-direction: column;
   min-width: max-content;
   width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 /* Tabulator-style modes using `fr`: allow the grid to shrink within the scroll pane */
@@ -1002,13 +1038,7 @@ input[type='checkbox'].grid-checkbox:focus-visible {
   pointer-events: none;
 }
 
-/* One full-width strip over split panes; sits just above native h-scrollbars (reserve from `--grid-hscroll-reserve`). */
-.grid-infinite-loading-row--unified {
-  position: absolute;
-  left: 0;
-  right: 0;
-  width: 100%;
-  box-sizing: border-box;
+.grid-infinite-loading-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1018,9 +1048,31 @@ input[type='checkbox'].grid-checkbox:focus-visible {
   background: #f9fafb;
   color: #374151;
   font-size: 13px;
-  z-index: 5;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.grid-infinite-loading-row__peer-fill {
+  width: 100%;
+  min-height: 1px;
+}
+
+.data-grid-row--loading {
+  min-height: 44px;
+}
+
+.data-grid-cell--loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 13px;
   pointer-events: none;
-  bottom: var(--grid-hscroll-reserve);
+}
+
+.data-grid-cell--loading-primary {
+  justify-content: flex-start;
 }
 
 .grid-infinite-loading-row__text {
