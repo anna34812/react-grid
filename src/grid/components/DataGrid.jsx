@@ -16,7 +16,6 @@ import { useGridSplitSync } from '../hooks/useGridSplitSync';
 import { useGridColumnResize } from '../hooks/useGridColumnResize';
 import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
-import { GridInfiniteFooter } from './GridInfiniteFooter';
 import { GridPagination } from './GridPagination';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
@@ -651,7 +650,6 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
       </div>
 
       {paginationMode === 'server' || paginationMode === 'client' ? <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} /> : null}
-      {paginationMode === 'infinite' ? <GridInfiniteFooter pageSize={queryState.pageSize} totalCount={queryState.totalCount} loadedCount={rows.length} onPageSizeChange={setPageSize} loadingMore={loadingMore} hasMore={hasMore} /> : null}
 
       {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterDraft[filterPopoverField]?.inValues ?? []} onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)} /> : null}
     </div>
