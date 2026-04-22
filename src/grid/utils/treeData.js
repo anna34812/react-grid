@@ -3,7 +3,7 @@
  * @param {{ idField?: string; parentField?: string }} [options]
  * @returns {Set<unknown>} ids that have at least one child
  */
-export function getIdsWithChildren(rows, options = {}) {
+export const getIdsWithChildren = (rows, options = {}) => {
   const idField = options.idField ?? 'id';
   const parentField = options.parentField ?? 'parentId';
   const withChildren = new Set();
@@ -12,7 +12,7 @@ export function getIdsWithChildren(rows, options = {}) {
     if (p !== undefined && p !== null) withChildren.add(p);
   }
   return withChildren;
-}
+};
 
 /**
  * DFS pre-order flatten; only includes children when parent id is in expandedIds.
@@ -22,7 +22,7 @@ export function getIdsWithChildren(rows, options = {}) {
  * @param {{ idField?: string; parentField?: string }} [options]
  * @returns {Record<string, unknown>[]}
  */
-export function flattenTreeRows(rows, expandedIds, options = {}) {
+export const flattenTreeRows = (rows, expandedIds, options = {}) => {
   const idField = options.idField ?? 'id';
   const parentField = options.parentField ?? 'parentId';
 
@@ -33,9 +33,8 @@ export function flattenTreeRows(rows, expandedIds, options = {}) {
   for (const r of rows) {
     const id = r[idField];
     const p = r[parentField];
-    if (p === undefined || p === null) {
-      roots.push(id);
-    } else {
+    if (p === undefined || p === null) roots.push(id);
+    else {
       if (!children.has(p)) children.set(p, []);
       children.get(p).push(id);
     }
@@ -50,19 +49,13 @@ export function flattenTreeRows(rows, expandedIds, options = {}) {
   }
 
   const out = [];
-
   const visit = (id, depth) => {
     const row = byId.get(id);
     if (!row) return;
     const childIds = children.get(id) ?? [];
     const hasChildren = childIds.length > 0;
     const expanded = hasChildren && expandedIds.has(id);
-    out.push({
-      ...row,
-      __treeDepth: depth,
-      __treeHasChildren: hasChildren,
-      __treeExpanded: expanded,
-    });
+    out.push({ ...row, __treeDepth: depth, __treeHasChildren: hasChildren, __treeExpanded: expanded });
     if (!hasChildren || !expanded) return;
     for (const cid of childIds) visit(cid, depth + 1);
   };
@@ -70,7 +63,7 @@ export function flattenTreeRows(rows, expandedIds, options = {}) {
   for (const rid of roots) visit(rid, 0);
 
   return out;
-}
+};
 
 /**
  * Bottom-up sum of leaf numeric field (e.g. size in bytes). Folders get sum of descendants; leaves use their own value.
@@ -79,7 +72,7 @@ export function flattenTreeRows(rows, expandedIds, options = {}) {
  * @param {{ idField?: string; parentField?: string; valueField: string }} options
  * @returns {Map<unknown, number>}
  */
-export function computeTreeAggregates(rows, options) {
+export const computeTreeAggregates = (rows, options) => {
   const idField = options.idField ?? 'id';
   const parentField = options.parentField ?? 'parentId';
   const valueField = options.valueField;
@@ -117,14 +110,14 @@ export function computeTreeAggregates(rows, options) {
   for (const r of rows) dfs(r[idField]);
 
   return memo;
-}
+};
 
 /**
  * @param {Array<Record<string, unknown>>} rows
  * @param {{ idField?: string; parentField?: string }} [options]
  * @returns {Map<unknown, unknown[]>}
  */
-export function getChildrenMap(rows, options = {}) {
+export const getChildrenMap = (rows, options = {}) => {
   const idField = options.idField ?? 'id';
   const parentField = options.parentField ?? 'parentId';
   /** @type {Map<unknown, unknown[]>} */
@@ -143,7 +136,7 @@ export function getChildrenMap(rows, options = {}) {
     );
   }
   return children;
-}
+};
 
 /**
  * Pre-order: root + all descendants (for descendant selection toggles).
@@ -151,7 +144,7 @@ export function getChildrenMap(rows, options = {}) {
  * @param {Map<unknown, unknown[]>} childrenMap
  * @returns {unknown[]}
  */
-export function collectSubtreeIds(rootId, childrenMap) {
+export const collectSubtreeIds = (rootId, childrenMap) => {
   /** @type {unknown[]} */
   const out = [];
   const walk = (id) => {
@@ -161,10 +154,10 @@ export function collectSubtreeIds(rootId, childrenMap) {
   };
   walk(rootId);
   return out;
-}
+};
 
 /** @param {number} bytes */
-export function formatBytes(bytes) {
+export const formatBytes = (bytes) => {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   const units = ['B', 'KB', 'MB', 'GB'];
   let v = bytes;
@@ -175,4 +168,4 @@ export function formatBytes(bytes) {
   }
   const digits = u === 0 ? 0 : v < 10 ? 2 : v < 100 ? 1 : 0;
   return `${v.toFixed(digits)} ${units[u]}`;
-}
+};

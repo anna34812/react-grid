@@ -1,239 +1,83 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useGridQuery } from '../hooks/useGridQuery';
-import { useGridData } from '../hooks/useGridData';
-import { useInlineEdit } from '../hooks/useInlineEdit';
-import { patchRow } from '../api/gridApi';
 import { getColumnMinWidth, getEffectivePin, isColumnResizable } from '../utils/columnPinning';
-import { nextSortDirection } from '../utils/gridSort';
 import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
-import { reorderRowsById } from '../utils/rowOrder';
-import { useGridColumnOrder } from '../hooks/useGridColumnOrder';
-import { useGridEditFocus } from '../hooks/useGridEditFocus';
-import { useGridFilters } from '../hooks/useGridFilters';
-import { useGridRowSelection } from '../hooks/useGridRowSelection';
-import { useGridSplitPaneScrollSync } from '../hooks/useGridSplitPaneScrollSync';
-import { useGridSplitSync } from '../hooks/useGridSplitSync';
-import { useGridColumnResize } from '../hooks/useGridColumnResize';
+import { useDataGridController } from '../hooks/useDataGridController';
 import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
 import { GridPagination } from './GridPagination';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
-/** Re-export for apps that imported `DEFAULT_ROW_SELECTION` from `DataGrid`. */
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
-/**
- * Column defs may set `resizable: false` to hide resize grip and double-click auto-fit for that column.
- *
- * Pagination: `paginationMode` controls the footer and how paging works:
- * - `server` — send `page` / `pageSize` to the API (default).
- * - `infinite` — server pages; append rows as the user scrolls the grid viewport (same horizontal scroll layout).
- * - `client` — fetch the full filtered/sorted result set and slice pages in the browser.
- * - `none` — no pagination UI; load and show all rows at once.
- *
- * Column sizing (`columnSizeMode`, Tabulator-style): `fitData` (fixed px), `fitDataStretchLast` (last column fills pane),
- * `fitWidth` (all columns share remaining width with `minmax(px, 1fr)`). After layout, default column widths use the
- * measured header width (label, filters, pin actions), not only `column.minWidth`, until the user resizes or auto-fits a column.
- */
-export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
-  const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
-  const { queryState, totalPages, setPage, setPageSize, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery();
-  const { rows, loading, loadingMore, hasMore, loadMore, error, setRows } = useGridData(queryState, setTotalCount, { paginationMode });
-  const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows);
-  const [dragOverRowId, setDragOverRowId] = useState(null);
-  const editedRowsRef = useRef(new Map());
-  const [customSavingCell, setCustomSavingCell] = useState(null);
-  const gridMeasureRootRef = useRef(null);
-  /** Scrollport for infinite load + layout fill; center pane’s `.grid-pane-scroll` only. */
-  const infiniteScrollRootRef = useRef(null);
-  const infiniteSentinelRef = useRef(null);
-  const paneScrollRefs = useRef({ left: null, right: null });
-  const [sidePaneHasRealX, setSidePaneHasRealX] = useState({ left: false, right: false });
-
-  const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder });
-
-  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize, columns: orderedColumns, columnSizeMode, measureRootRef: gridMeasureRootRef, enableFiltering });
-
-  const viewRowIds = useMemo(() => rows.map((r) => r.id), [rows]);
-
-  const { rs, selectedSet, selectionEnabled, showSelectColumn, enableClickSelection, leftColumns, centerColumns, rightColumns, hasSplit, selectionPane, leadingPane, toggleRowSelection, toggleSelectAllInView, allSelectedInView, someSelectedInView, applySelectionForRowClick, handleRowBackgroundClick, editableClickSelectionTimerRef } = useGridRowSelection({
-    rowSelection: rowSelectionProp,
-    onSelectionChange,
+export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
+  const {
+    queryState,
+    totalPages,
+    setPage,
+    setPageSize,
+    displayRows,
+    controlledLoading,
+    gridLoadingMore,
+    hasRows,
+    pageFrom,
+    pageTo,
+    editError,
+    editingCell,
+    draftValue,
+    savingCell,
+    customSavingCell,
+    setDraftValue,
+    startEdit,
+    cancelEdit,
+    handleSaveEdit,
+    updateCustomCellValue,
     orderedColumns,
     pinnedOverrides,
-    rows,
-    viewRowIds,
-    rowIdField: 'id',
+    dragOverField,
+    setDragOverField,
+    handleColumnDrop,
+    handleColumnHeaderDragStart,
+    setPinForField,
+    columnWidths,
+    startResize,
+    autoFitColumn,
+    resizingField,
+    selectionState,
+    filterState,
+    verticalScrollMasterPane,
+    gridSplitRowRef,
+    paneScrollRefs,
+    sidePaneHasRealX,
+    handleSort,
+    handleRowDrop,
+    dragOverRowId,
+    setDragOverRowId,
+    gridMeasureRootRef,
+    infiniteScrollRootRef,
+    infiniteSentinelRef,
+  } = useDataGridController({
+    columns,
+    dataSource,
+    fetchData,
+    loading: loadingProp,
+    onReady,
+    onQueryChange,
+    resetPaginationTrigger,
+    columnOrder: columnOrderProp,
+    onColumnOrderChange,
+    enableColumnReorder,
+    enableRowDrag,
+    onRowOrderChange,
+    rowSelection: rowSelectionProp,
+    onSelectionChange,
+    onEditedRowsChange,
+    enableFiltering,
+    enableColumnResize,
+    paginationMode,
+    columnSizeMode,
   });
-
-  const { filterDraft, setFilterDraft, filterPopoverField, setFilterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: false });
-
-  useGridEditFocus(editingCell);
-  const verticalScrollMasterPane = hasSplit && rightColumns.length > 0 ? 'right' : 'center';
-
-  const gridSplitRowRef = useGridSplitSync({ hasSplit, rowCount: rows.length, variant: 'dataGrid' });
-
-  const splitScrollSyncKey = `${verticalScrollMasterPane}|${leftColumns.map((c) => c.field).join(',')}|${centerColumns.map((c) => c.field).join(',')}|${rightColumns.map((c) => c.field).join(',')}`;
-  useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rows.length, splitScrollSyncKey);
-
-  const updateSidePaneRealX = useCallback(() => {
-    if (!hasSplit) {
-      setSidePaneHasRealX((prev) => (prev.left || prev.right ? { left: false, right: false } : prev));
-      return;
-    }
-    const leftEl = paneScrollRefs.current.left;
-    const rightEl = paneScrollRefs.current.right;
-    const hasMeaningfulOverflow = (el) => el && el.scrollWidth - el.clientWidth > SIDE_X_OVERFLOW_THRESHOLD_PX;
-    setSidePaneHasRealX((prev) => {
-      const next = {
-        left: Boolean(hasMeaningfulOverflow(leftEl)),
-        right: Boolean(hasMeaningfulOverflow(rightEl)),
-      };
-      return prev.left === next.left && prev.right === next.right ? prev : next;
-    });
-  }, [hasSplit, SIDE_X_OVERFLOW_THRESHOLD_PX]);
-
-  useLayoutEffect(() => {
-    updateSidePaneRealX();
-    const rafId = requestAnimationFrame(updateSidePaneRealX);
-    return () => cancelAnimationFrame(rafId);
-  }, [updateSidePaneRealX, rows.length, leftColumns.length, centerColumns.length, rightColumns.length, columnSizeMode, columnWidths]);
-
-  useEffect(() => {
-    if (!hasSplit) return;
-
-    const trackedPanes = [
-      ['left', paneScrollRefs.current.left],
-      ['right', paneScrollRefs.current.right],
-    ].filter(([, el]) => Boolean(el));
-    if (trackedPanes.length === 0) return;
-    const trackedContent = trackedPanes.map(([, el]) => el.querySelector('.data-grid')).filter(Boolean);
-
-    updateSidePaneRealX();
-    const timeoutId = setTimeout(updateSidePaneRealX, 0);
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(updateSidePaneRealX);
-    for (const [, el] of trackedPanes) ro.observe(el);
-    for (const el of trackedContent) ro.observe(el);
-    if (gridSplitRowRef.current) ro.observe(gridSplitRowRef.current);
-    return () => {
-      clearTimeout(timeoutId);
-      ro.disconnect();
-    };
-  }, [hasSplit, updateSidePaneRealX]);
-
-  const handleRowDrop = useCallback(
-    (event, targetRowId) => {
-      if (!enableRowDrag) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setDragOverRowId(null);
-      const raw = event.dataTransfer.getData('application/x-data-grid-row-id');
-      if (!raw || raw === String(targetRowId)) return;
-
-      setRows((previous) => {
-        const next = reorderRowsById(previous, raw, targetRowId);
-        onRowOrderChange?.({ orderedIds: next.map((r) => r.id), rows: next });
-        return next;
-      });
-    },
-    [enableRowDrag, setRows, onRowOrderChange],
-  );
-
-  const effectiveTotal = queryState.totalCount || 0;
-  const pageFrom = effectiveTotal === 0 ? 0 : (queryState.page - 1) * queryState.pageSize + 1;
-  const pageTo = Math.min(queryState.page * queryState.pageSize, effectiveTotal);
-  const hasRows = rows.length > 0;
-
-  useEffect(() => {
-    if (paginationMode !== 'infinite') return;
-    const root = infiniteScrollRootRef.current;
-    const sentinel = infiniteSentinelRef.current;
-    if (!root || !sentinel) return;
-
-    const observer = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && void loadMore(), { root, rootMargin: '160px', threshold: 0 });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [paginationMode, loadMore, rows.length]);
-
-  useLayoutEffect(() => {
-    if (paginationMode !== 'infinite') return;
-    if (loading || loadingMore || !hasMore) return;
-    const root = infiniteScrollRootRef.current;
-    const sentinel = infiniteSentinelRef.current;
-    if (!root || !sentinel) return;
-    const rootRect = root.getBoundingClientRect();
-    const sentRect = sentinel.getBoundingClientRect();
-    if (sentRect.bottom <= rootRect.bottom + 8) void loadMore();
-  }, [paginationMode, loading, loadingMore, hasMore, rows.length, loadMore]);
-
-  /** Keep the synthetic loading row visible (11th row position) while fetching next page. */
-  useLayoutEffect(() => {
-    if (paginationMode !== 'infinite' || !loadingMore) return;
-    const root = infiniteScrollRootRef.current;
-    if (!root) return;
-    root.scrollTop = root.scrollHeight;
-  }, [paginationMode, loadingMore, rows.length]);
-
-  const handleSort = (field) => {
-    const direction = nextSortDirection(queryState.sortField, queryState.sortDirection, field);
-    if (!direction) {
-      setSort(null, null);
-      return;
-    }
-
-    setSort(field, direction);
-  };
-
-  const emitEditedRowsChange = useCallback(
-    ({ rowId, field, value, previousRow }) => {
-      const nextEditedRow = { ...previousRow, [field]: value };
-      editedRowsRef.current.set(rowId, nextEditedRow);
-
-      const editedRows = [...editedRowsRef.current.values()];
-      onEditedRowsChange?.({ currentEditedRow: nextEditedRow, editedRows });
-    },
-    [onEditedRowsChange],
-  );
-
-  const handleSaveEdit = useCallback(
-    async ({ row, column }) => {
-      const previousRow = row;
-      const nextValue = column.type === 'number' ? Number(draftValue) : draftValue;
-      const didSave = await saveEdit({ rowId: row.id, field: column.field, column });
-      if (!didSave) return;
-
-      emitEditedRowsChange({ rowId: row.id, field: column.field, value: nextValue, previousRow });
-    },
-    [draftValue, saveEdit, emitEditedRowsChange],
-  );
-
-  const updateCustomCellValue = useCallback(
-    async ({ row, column, nextValue }) => {
-      const normalizedValue = column.type === 'number' ? Number(nextValue) : nextValue;
-      if (Object.is(row[column.field], normalizedValue)) return true;
-
-      const previousRows = [];
-      setCustomSavingCell({ rowId: row.id, field: column.field });
-      setRows((rowsSnapshot) => {
-        previousRows.push(...rowsSnapshot);
-        return rowsSnapshot.map((currentRow) => (currentRow.id === row.id ? { ...currentRow, [column.field]: normalizedValue } : currentRow));
-      });
-
-      try {
-        await patchRow(row.id, { [column.field]: normalizedValue }, { treeMode: false });
-        emitEditedRowsChange({ rowId: row.id, field: column.field, value: normalizedValue, previousRow: row });
-        return true;
-      } catch (_error) {
-        setRows(previousRows);
-        return false;
-      } finally {
-        setCustomSavingCell(null);
-      }
-    },
-    [setRows, emitEditedRowsChange],
-  );
+  const { rs, selectedSet, selectionEnabled, showSelectColumn, enableClickSelection, leftColumns, centerColumns, rightColumns, hasSplit, selectionPane, leadingPane, toggleRowSelection, toggleSelectAllInView, allSelectedInView, someSelectedInView, applySelectionForRowClick, handleRowBackgroundClick, editableClickSelectionTimerRef } = selectionState;
+  const { filterDraft, setFilterDraft, filterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = filterState;
 
   const renderCell = (row, column) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.field === column.field;
@@ -390,7 +234,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
         <div ref={setScrollRef} className={[hasSplit ? 'grid-pane-scroll grid-pane-scroll--pinned' : 'grid-pane-scroll', hasSplit && pane !== 'center' && sidePaneHasRealX[pane] ? 'grid-pane-scroll--has-real-x' : ''].filter(Boolean).join(' ')} data-hscroll={hasSplit ? 'always' : 'auto'}>
-          <div className={['data-grid', resizingField ? 'data-grid--column-resizing' : ''].filter(Boolean).join(' ') || undefined} data-column-size-mode={columnSizeMode} role="grid" aria-rowcount={rows.length} aria-colcount={ariaColCount}>
+          <div className={['data-grid', resizingField ? 'data-grid--column-resizing' : ''].filter(Boolean).join(' ') || undefined} data-column-size-mode={columnSizeMode} role="grid" aria-rowcount={displayRows.length} aria-colcount={ariaColCount}>
             <div className="data-grid-header" role="presentation">
               <div className="data-grid-header-row" role="row" {...(hasSplit ? { 'data-sync-header': '' } : {})} style={{ gridTemplateColumns: colTpl }}>
                 {showLeadingRowDrag ? (
@@ -549,7 +393,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
             </div>
             <div ref={setBodyScrollRef} className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
               <div className="data-grid-body" role="rowgroup">
-                {rows.map((row, rowIndex) => {
+                {displayRows.map((row, rowIndex) => {
                   const rowSelected = selectedSet.has(row.id);
                   const rowDragOver = enableRowDrag && dragOverRowId === row.id;
                   return (
@@ -603,7 +447,7 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
                     </div>
                   );
                 })}
-                {paginationMode === 'infinite' && loadingMore ? (
+                {paginationMode === 'infinite' && gridLoadingMore ? (
                   <div role="row" className="data-grid-row data-grid-row--loading" style={{ gridTemplateColumns: colTpl }}>
                     <div role="gridcell" className={`data-grid-cell data-grid-cell--loading ${pane === 'center' ? 'data-grid-cell--loading-primary' : 'data-grid-cell--loading-peer'}`} style={{ gridColumn: '1 / -1' }} aria-hidden={pane === 'center' ? undefined : true}>
                       {pane === 'center' ? (
@@ -629,12 +473,11 @@ export const DataGrid = ({ columns, columnOrder: columnOrderProp, onColumnOrderC
 
   return (
     <div className="grid-container" ref={gridMeasureRootRef}>
-      {/* {error && <p className="status error">{error}</p>}
-      {editError && <p className="status error">{editError}</p>} */}
-      {!loading && !hasRows && <p className="status">No rows found.</p>}
+      {!controlledLoading && !hasRows && <p className="status">No rows found.</p>}
+      {editError && <p className="status error">{editError}</p>}
 
       <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
-        {loading ? (
+        {controlledLoading ? (
           <div className="grid-loading-overlay" role="status" aria-live="polite">
             <div className="grid-loading-chip">
               <span className="grid-loading-spinner" aria-hidden />

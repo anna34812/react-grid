@@ -18,38 +18,44 @@ import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
-/** Re-export for convenience; same shape as DataGrid. */
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
-/** Must match `.tree-row-height-anim--animate` / `--animate-out` duration in App.css */
 const TREE_ROW_ANIM_MS = 420;
 const TREE_ROW_STAGGER_MS = 32;
 
-/**
- * Tree (hierarchical) data grid: div-based body for reliable row animations; same features as DataGrid tree mode (filters, sort, pin, column reorder, selection, aggregates, expand/collapse). No pagination — the flattened visible tree is shown in full (typical for tree UIs).
- * Pass flat rows with `parentId` (or `treeData.parentField`); roots use `null` parent.
- * `treeData.groupSelection`: `'self'` (row only) or `'descendants'` (parent checkbox selects subtree). `treeData.showGroupSelectionControl` (default true): toolbar to switch modes.
- *
- * `animateRows`: each body row uses `0fr → 1fr` on mount (expand) and `1fr → 0fr` before removal (collapse). Set `false` for instant show/hide.
- * Columns may set `resizable: false` to disable resize grip and double-click auto-fit for that column.
- * `columnSizeMode`: same as DataGrid (`fitData`, `fitDataStretchLast`, `fitWidth`).
- */
-export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
+export const TreeDataGrid = (props) => {
+  const { columns, dataSource, treeData: treeDataConfig, rowSelection: rowSelectionProp, onSelectionChange, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA } = props;
+  const { columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false } = props;
+  const { onEditedRowsChange = () => {} } = props;
+  const { enableFiltering = true } = props;
+
   const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
 
   const { queryState, setSort, setFilter, clearFilters, setTotalCount } = useGridQuery(gridQueryInitial);
   const { rows, loading, error, setRows } = useGridData(queryState, setTotalCount);
-  const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setRows, { apiOptions: { treeMode: true } });
+
+  const usesExternalDataSource = Array.isArray(dataSource);
+  const [externalRows, setExternalRows] = useState(() => (usesExternalDataSource ? dataSource : []));
+
+  //
+  useEffect(() => {
+    if (!usesExternalDataSource) return;
+    setExternalRows(Array.isArray(dataSource) ? dataSource : []);
+  }, [usesExternalDataSource, dataSource]);
+
+  const gridRows = usesExternalDataSource ? externalRows : rows;
+  const setGridRows = usesExternalDataSource ? setExternalRows : setRows;
+  const gridLoading = usesExternalDataSource ? false : loading;
+  const gridError = usesExternalDataSource ? null : error;
+  const { editingCell, draftValue, savingCell, editError, setDraftValue, startEdit, cancelEdit, saveEdit } = useInlineEdit(setGridRows, { apiOptions: { treeMode: true } });
   const treeParentField = treeDataConfig.parentField ?? 'parentId';
   const treeRowIdField = treeDataConfig.rowIdField ?? 'id';
   const treeExpandColumnField = treeDataConfig.expandColumnField ?? 'name';
   const treeIndentPerLevel = treeDataConfig.indentPerLevel ?? 16;
   const [expandedRowIds, setExpandedRowIds] = useState(() => new Set());
-  /** While set, that node is visually collapsed but children stay mounted until close animation finishes. */
   const [pendingCollapseId, setPendingCollapseId] = useState(null);
-  /** Descendants of a cancelled collapse: keep full height without re-running the open animation. */
   const [openAnimSuppressedIds, setOpenAnimSuppressedIds] = useState(() => new Set());
   const expandedRef = useRef(expandedRowIds);
   expandedRef.current = expandedRowIds;
@@ -63,43 +69,26 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   const paneScrollRefs = useRef({ left: null, right: null });
   const [sidePaneHasRealX, setSidePaneHasRealX] = useState({ left: false, right: false });
 
-  const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({
-    columns,
-    columnOrder: columnOrderProp,
-    onColumnOrderChange,
-    enableColumnReorder,
-  });
+  const { orderedColumns, pinnedOverrides, dragOverField, setDragOverField, handleColumnDrop, handleColumnHeaderDragStart, setPinForField } = useGridColumnOrder({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder });
 
-  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({
-    enabled: enableColumnResize,
-    columns: orderedColumns,
-    columnSizeMode,
-    measureRootRef: gridMeasureRootRef,
-    enableFiltering,
-  });
+  const { columnWidths, startResize, autoFitColumn, resizingField } = useGridColumnResize({ enabled: enableColumnResize, columns: orderedColumns, columnSizeMode, measureRootRef: gridMeasureRootRef, enableFiltering });
 
   useEffect(() => {
-    if (!rows.length || treeExpandInitRef.current) return;
+    if (!gridRows.length || treeExpandInitRef.current) return;
     treeExpandInitRef.current = true;
-    setExpandedRowIds(getIdsWithChildren(rows, { idField: treeRowIdField, parentField: treeParentField }));
-  }, [rows, treeRowIdField, treeParentField]);
+    setExpandedRowIds(getIdsWithChildren(gridRows, { idField: treeRowIdField, parentField: treeParentField }));
+  }, [gridRows, treeRowIdField, treeParentField]);
 
-  const rowsById = useMemo(() => new Map(rows.map((r) => [r[treeRowIdField], r])), [rows, treeRowIdField]);
+  const rowsById = useMemo(() => new Map(gridRows.map((r) => [r[treeRowIdField], r])), [gridRows, treeRowIdField]);
 
-  const childrenMap = useMemo(() => getChildrenMap(rows, { idField: treeRowIdField, parentField: treeParentField }), [rows, treeRowIdField, treeParentField]);
+  const childrenMap = useMemo(() => getChildrenMap(gridRows, { idField: treeRowIdField, parentField: treeParentField }), [gridRows, treeRowIdField, treeParentField]);
 
   const [groupSelection, setGroupSelection] = useState(() => treeDataConfig.groupSelection ?? 'self');
   useEffect(() => {
     if (treeDataConfig.groupSelection !== undefined) setGroupSelection(treeDataConfig.groupSelection);
   }, [treeDataConfig.groupSelection]);
 
-  const treeOptions = useMemo(
-    () => ({
-      groupSelection,
-      childrenMap,
-    }),
-    [groupSelection, childrenMap],
-  );
+  const treeOptions = useMemo(() => ({ groupSelection, childrenMap }), [groupSelection, childrenMap]);
 
   const isDescendantOf = useCallback(
     (row, ancestorId) => {
@@ -114,10 +103,10 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   );
 
   const flattenedRows = useMemo(() => {
-    const flat = flattenTreeRows(rows, expandedRowIds, { idField: treeRowIdField, parentField: treeParentField });
+    const flat = flattenTreeRows(gridRows, expandedRowIds, { idField: treeRowIdField, parentField: treeParentField });
     if (pendingCollapseId == null) return flat;
     return flat.map((r) => (r[treeRowIdField] === pendingCollapseId ? { ...r, __treeExpanded: false } : r));
-  }, [rows, expandedRowIds, pendingCollapseId, treeRowIdField, treeParentField]);
+  }, [gridRows, expandedRowIds, pendingCollapseId, treeRowIdField, treeParentField]);
 
   useEffect(() => {
     const flatIds = new Set(flattenedRows.map((r) => r[treeRowIdField]));
@@ -139,12 +128,12 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
   const treeAggregateMap = useMemo(() => {
     if (!treeDataConfig.aggregateValueField) return null;
-    return computeTreeAggregates(rows, {
+    return computeTreeAggregates(gridRows, {
       valueField: treeDataConfig.aggregateValueField,
       idField: treeRowIdField,
       parentField: treeParentField,
     });
-  }, [rows, treeDataConfig.aggregateValueField, treeRowIdField, treeParentField]);
+  }, [gridRows, treeDataConfig.aggregateValueField, treeRowIdField, treeParentField]);
 
   useEffect(() => {
     setTotalCount(flattenedRows.length);
@@ -185,7 +174,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
       if (pendingCollapseRef.current === id) {
         setOpenAnimSuppressedIds((prev) => {
           const next = new Set(prev);
-          for (const r of rows) {
+          for (const r of gridRows) {
             if (isDescendantOf(r, id)) next.add(r[treeRowIdField]);
           }
           return next;
@@ -237,17 +226,17 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
       setPendingCollapseId(id);
     },
-    [animateRows, isDescendantOf, rows, rowsById],
+    [animateRows, isDescendantOf, gridRows, rowsById, treeRowIdField],
   );
 
   const viewRowIds = useMemo(() => flattenedRows.map((r) => r[treeRowIdField]), [flattenedRows, treeRowIdField]);
 
-  const { rs, selectedSet, selectionEnabled, showSelectColumn, enableClickSelection, leftColumns, centerColumns, rightColumns, hasSplit, selectionPane, leadingPane, toggleRowSelection, toggleSelectAllInView, allSelectedInView, someSelectedInView, applySelectionForRowClick, handleRowBackgroundClick, editableClickSelectionTimerRef } = useGridRowSelection({
+  const { rs, selectedSet, selectionEnabled, showSelectColumn, enableClickSelection, leftColumns, centerColumns, rightColumns, hasSplit, selectionPane, toggleRowSelection, toggleSelectAllInView, allSelectedInView, someSelectedInView, applySelectionForRowClick, handleRowBackgroundClick, editableClickSelectionTimerRef } = useGridRowSelection({
     rowSelection: rowSelectionProp,
     onSelectionChange,
     orderedColumns,
     pinnedOverrides,
-    rows,
+    rows: gridRows,
     viewRowIds,
     rowIdField: treeRowIdField,
     treeOptions,
@@ -257,7 +246,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
   const someSelectedVisible = someSelectedInView;
   const toggleSelectAllVisible = toggleSelectAllInView;
 
-  const { filterDraft, setFilterDraft, filterPopoverField, setFilterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: true });
+  const { filterDraft, setFilterDraft, filterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: true });
 
   useGridEditFocus(editingCell);
   const verticalScrollMasterPane = hasSplit && rightColumns.length > 0 ? 'right' : 'center';
@@ -275,10 +264,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     const rightEl = paneScrollRefs.current.right;
     const hasMeaningfulOverflow = (el) => el && el.scrollWidth - el.clientWidth > SIDE_X_OVERFLOW_THRESHOLD_PX;
     setSidePaneHasRealX((prev) => {
-      const next = {
-        left: Boolean(hasMeaningfulOverflow(leftEl)),
-        right: Boolean(hasMeaningfulOverflow(rightEl)),
-      };
+      const next = { left: Boolean(hasMeaningfulOverflow(leftEl)), right: Boolean(hasMeaningfulOverflow(rightEl)) };
       return prev.left === next.left && prev.right === next.right ? prev : next;
     });
   }, [hasSplit, SIDE_X_OVERFLOW_THRESHOLD_PX]);
@@ -354,7 +340,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
       const previousRows = [];
       setCustomSavingCell({ rowId: row.id, field: column.field });
-      setRows((rowsSnapshot) => {
+      setGridRows((rowsSnapshot) => {
         previousRows.push(...rowsSnapshot);
         return rowsSnapshot.map((currentRow) => (currentRow.id === row.id ? { ...currentRow, [column.field]: normalizedValue } : currentRow));
       });
@@ -363,14 +349,14 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
         await patchRow(row.id, { [column.field]: normalizedValue }, { treeMode: true });
         emitEditedRowsChange({ rowId: row.id, field: column.field, value: normalizedValue, previousRow: row });
         return true;
-      } catch (_error) {
-        setRows(previousRows);
+      } catch {
+        setGridRows(previousRows);
         return false;
       } finally {
         setCustomSavingCell(null);
       }
     },
-    [setRows, emitEditedRowsChange],
+    [setGridRows, emitEditedRowsChange],
   );
 
   const renderCell = (row, column) => {
@@ -496,11 +482,8 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
     const applied = queryState.filters[field];
 
     let values = null;
-    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) {
-      values = draft.inValues.map(String);
-    } else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) {
-      values = applied.value.map(String);
-    }
+    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) values = draft.inValues.map(String);
+    else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) values = applied.value.map(String);
 
     if (!values || values.length === 0) return { isActive: false };
 
@@ -515,9 +498,7 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
 
   const renderSectionGrid = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
-    const setScrollRef = (node) => {
-      if (pane === 'left' || pane === 'right') paneScrollRefs.current[pane] = node;
-    };
+    const setScrollRef = (node) => (pane === 'left' || pane === 'right') && (paneScrollRefs.current[pane] = node);
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect, columnWidths, columnSizeMode });
@@ -580,9 +561,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                               {direction === 'asc' && ' \u2191'}
                               {direction === 'desc' && ' \u2193'}
                             </button>
-                            {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
-                              ⋮
-                            </button> */}
                             <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
                               <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
                                 L
@@ -650,9 +628,6 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
                             {direction === 'asc' && ' \u2191'}
                             {direction === 'desc' && ' \u2193'}
                           </button>
-                          {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
-                            ⋮
-                          </button> */}
                           <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
                             <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
                               L
@@ -768,12 +743,12 @@ export const TreeDataGrid = ({ columns, treeData: treeDataConfig, columnOrder: c
           </label>
         </div>
       ) : null}
-      {error && <p className="status error">{error}</p>}
+      {gridError && <p className="status error">{gridError}</p>}
       {editError && <p className="status error">{editError}</p>}
-      {!loading && !hasRows && <p className="status">No rows found.</p>}
+      {!gridLoading && !hasRows && <p className="status">No rows found.</p>}
 
       <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
-        {loading ? (
+        {gridLoading ? (
           <div className="grid-loading-overlay" role="status" aria-live="polite">
             <div className="grid-loading-chip">
               <span className="grid-loading-spinner" aria-hidden />

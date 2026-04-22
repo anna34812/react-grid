@@ -11,11 +11,7 @@ export function useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rowCount, 
     const rowEl = gridSplitRowRef.current;
     if (!rowEl) return;
 
-    const master =
-      rowEl.querySelector('.grid-pane-body-scroll.grid-pane-scroll--y-master') ??
-      rowEl.querySelector('.grid-pane--center .grid-pane-body-scroll') ??
-      rowEl.querySelector('.grid-pane-scroll.grid-pane-scroll--y-master') ??
-      rowEl.querySelector('.grid-pane--center .grid-pane-scroll');
+    const master = rowEl.querySelector('.grid-pane-body-scroll.grid-pane-scroll--y-master') ?? rowEl.querySelector('.grid-pane--center .grid-pane-body-scroll') ?? rowEl.querySelector('.grid-pane-scroll.grid-pane-scroll--y-master') ?? rowEl.querySelector('.grid-pane--center .grid-pane-scroll');
     const allScrollPanes = [...rowEl.querySelectorAll('.grid-pane .grid-pane-body-scroll')];
     const effectiveScrollPanes = allScrollPanes.length > 0 ? allScrollPanes : [...rowEl.querySelectorAll('.grid-pane .grid-pane-scroll')];
     if (!master || effectiveScrollPanes.length <= 1) return;
@@ -44,9 +40,7 @@ export function useGridSplitPaneScrollSync(gridSplitRowRef, hasSplit, rowCount, 
       e.preventDefault();
       master.scrollTop += e.deltaY;
     };
-    for (const p of peers) {
-      p.addEventListener('wheel', onWheelPeers, { passive: false });
-    }
+    for (const p of peers) p.addEventListener('wheel', onWheelPeers, { passive: false });
 
     syncAllFrom(master);
 

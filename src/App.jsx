@@ -1,24 +1,33 @@
 import { useCallback, useMemo, useState } from 'react';
-import { DataGrid, DEFAULT_ROW_SELECTION, COLUMN_SIZE_MODE } from './grid/components/DataGrid';
-import { TreeDataGrid } from './grid/components/TreeDataGrid';
+import { DEFAULT_ROW_SELECTION, COLUMN_SIZE_MODE } from './grid/components/DataGrid';
 import { formatBytes } from './grid/utils/treeData';
+import IXGrid from './grid/components/IXGrid';
+import { mockRows } from './grid/mock/data';
+import { treeFlatRows } from './grid/mock/treeData';
+
 import './App.css';
 
 function App() {
   const [enableFiltering, setEnableFiltering] = useState(true);
   const [columnSizeMode, setColumnSizeMode] = useState(COLUMN_SIZE_MODE.FIT_DATA);
   const [paginationMode, setPaginationMode] = useState('server');
-  const [selection, setSelection] = useState({ selectedIds: [], selectedRows: [] });
-  const [editedState, setEditedState] = useState({ currentEditedRow: null, editedRows: [] });
+  const [resetPaginationTrigger, setResetPaginationTrigger] = useState(0);
 
-  const onSelectionChange = useCallback((detail) => setSelection({ selectedIds: detail.selectedIds, selectedRows: detail.selectedRows }), []);
+  const onSelectionChange = useCallback(({ selectedIds, selectedRows }) => console.log({ selectedIds: selectedIds, selectedRows: selectedRows }), []);
+  const onEditedRowsChange = useCallback(({ currentEditedRow, editedRows }) => console.log({ currentEditedRow: currentEditedRow, editedRows: editedRows }), []);
+  const fetchData = useCallback(async ({ page, pageSize }) => {
+    const startRow = Math.max(0, (page - 1) * pageSize);
+    const rows = mockRows.slice(startRow, startRow + pageSize);
+    // return { rows, total: mockRows.length };
 
-  const onEditedRowsChange = useCallback(({ currentEditedRow, editedRows }) => {
-    console.log('onEditedRowsChange', currentEditedRow, editedRows);
+    const res = await fetch(`https://dummyjson.com/products?limit=${pageSize}&skip=${startRow}`);
+    const json = await res.json();
 
-    setEditedState({ currentEditedRow: currentEditedRow, editedRows: editedRows });
+    const data = startRow === 1 ? json.products.map((m) => ({ ...m, description: 'test' })) : json.products;
+    return { rows: data, total: json.total };
   }, []);
 
+  // --* data grid
   const columns = useMemo(
     () => [
       { field: 'id', label: 'ID', editable: false, filterable: false, pinned: 'left', minWidth: 100 },
@@ -63,6 +72,7 @@ function App() {
     [],
   );
 
+  // --* tree data
   const treeColumns = useMemo(
     () => [
       { field: 'name', label: 'File Explorer', editable: false, filterable: true, filterOperator: 'contains', minWidth: 260, movable: true },
@@ -97,16 +107,13 @@ function App() {
 
   return (
     <main className="app">
-      <h1>React Data Grid MVP</h1>
-      <p>
-        Row selection: <code>rowSelection</code> (<code>DEFAULT_ROW_SELECTION</code> + overrides) and a separate <code>onSelectionChange</code> prop. Column filters: <code>enableFiltering</code>. Column reorder: <code>movable: true</code> — drag the title row (sort label); otherwise use the ⠿ handle (<code>enableColumnReorder</code>).
-      </p>
+      <h1>Data Grid</h1>
       <p className="app-options">
         <label>
           <input type="checkbox" checked={enableFiltering} onChange={(e) => setEnableFiltering(e.target.checked)} /> Show column filters
         </label>
         <label>
-          Column size mode:{' '}
+          Column size mode
           <select value={columnSizeMode} onChange={(e) => setColumnSizeMode(e.target.value)} aria-label="Column size mode">
             <option value={COLUMN_SIZE_MODE.FIT_DATA}>Fit to data</option>
             <option value={COLUMN_SIZE_MODE.FIT_DATA_STRETCH_LAST}>Fit to data, stretch last column</option>
@@ -114,7 +121,7 @@ function App() {
           </select>
         </label>
         <label>
-          Pagination:{' '}
+          Pagination
           <select value={paginationMode} onChange={(e) => setPaginationMode(e.target.value)} aria-label="Pagination mode">
             <option value="server">Server (pages)</option>
             <option value="infinite">Server (infinite scroll)</option>
@@ -122,33 +129,31 @@ function App() {
             <option value="none">None</option>
           </select>
         </label>
+        <button type="button" onClick={() => setResetPaginationTrigger((v) => v + 1)}>
+          Reset pagination
+        </button>
       </p>
 
-      <DataGrid
-        columnSizeMode={columnSizeMode}
-        paginationMode={paginationMode}
+      <IXGrid
         columns={columns}
-        enableColumnReorder
-        enableRowDrag
+        dataSource={paginationMode === 'client' || paginationMode === 'none' ? mockRows : undefined} // client or none
+        fetchData={paginationMode === 'server' || paginationMode === 'infinite' ? fetchData : undefined} // server or infinite
+        paginationMode={paginationMode}
+        // resetPaginationOptions={{ page: 1 }}
+        resetPaginationTrigger={resetPaginationTrigger}
+        // selection
         rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }}
         onSelectionChange={onSelectionChange}
+        //
+        columnSizeMode={columnSizeMode}
+        enableColumnReorder
+        enableRowDrag
         onEditedRowsChange={onEditedRowsChange}
         enableFiltering={enableFiltering}
       />
 
-      <h2 style={{ marginTop: '2rem' }}>Tree data (file explorer)</h2>
-      <p>
-        <code>TreeDataGrid</code> uses a div-based <code>role=&quot;grid&quot;</code> body for tree rows. Flat data with <code>parentId</code>; <code>treeData</code> sets expand/collapse, indent, and optional <code>aggregateValueField</code> (as <code>treeAggregate</code> in <code>renderCell</code>).
-      </p>
-      <TreeDataGrid columns={treeColumns} treeData={treeDataConfig} enableColumnReorder rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} enableFiltering={enableFiltering} />
-
-      <p className="selection-summary">
-        Selected: {selection.selectedIds.length > 0 ? selection.selectedIds.join(', ') : 'none'}
-        {selection.selectedRows.length > 0 && <span> ({selection.selectedRows.map((r) => r.name).join(', ')})</span>}
-      </p>
-      <p className="selection-summary">
-        Last edited row: {editedState.currentEditedRow ? editedState.currentEditedRow.id : 'none'} / Edited rows total: {editedState.editedRows.length}
-      </p>
+      <h2 style={{ marginTop: '2rem' }}>Tree Data</h2>
+      <IXGrid treeData={{ config: treeDataConfig }} dataSource={treeFlatRows} columnSizeMode={columnSizeMode} paginationMode={paginationMode} columns={treeColumns} enableColumnReorder enableRowDrag rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
     </main>
   );
 }

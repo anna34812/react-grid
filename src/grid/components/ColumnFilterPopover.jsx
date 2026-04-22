@@ -7,10 +7,7 @@ const FilterFunnelIcon = () => (
   </svg>
 );
 
-/**
- * Floating multi-select filter; search input filters the option list only.
- */
-export function ColumnFilterPopover({ isOpen, onClose, anchorEl, label, distinctValues, selectedValues, onChange }) {
+export const ColumnFilterPopover = ({ isOpen, onClose, anchorEl, label, distinctValues, selectedValues, onChange }) => {
   const popoverRef = useRef(null);
   const selectAllRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -99,6 +96,6 @@ export function ColumnFilterPopover({ isOpen, onClose, anchorEl, label, distinct
   );
 
   return createPortal(popover, document.body);
-}
+};
 
 export { FilterFunnelIcon };

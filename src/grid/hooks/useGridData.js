@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getRows } from '../api/gridApi';
 
-/** When not using server-side page params, request a single page large enough for the full filtered dataset. */
 const UNPAGED_PAGE_SIZE = Number.MAX_SAFE_INTEGER;
 
 const resolvePaginationMode = (paginationMode) => {
@@ -9,6 +8,22 @@ const resolvePaginationMode = (paginationMode) => {
   if (paginationMode === 'none') return 'none';
   if (paginationMode === 'infinite') return 'infinite';
   return 'server';
+};
+
+const getRowIdentity = (row, fallback) => {
+  const id = row?.id;
+  if (id === undefined || id === null || id === '') return `__fallback__${fallback}`;
+  return String(id);
+};
+
+const dedupeRowsByIdentity = (rows) => {
+  const seen = new Set();
+  return rows.filter((row, index) => {
+    const identity = getRowIdentity(row, index);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 };
 
 export const useGridData = (queryState, setTotalCount, options = {}) => {
@@ -23,17 +38,7 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState('');
 
-  const infiniteSignature = useMemo(
-    () =>
-      JSON.stringify({
-        sortField: queryState.sortField,
-        sortDirection: queryState.sortDirection,
-        filters: queryState.filters ?? {},
-        pageSize: queryState.pageSize,
-        treeMode: queryState.treeMode ?? false,
-      }),
-    [queryState.sortField, queryState.sortDirection, queryState.filters, queryState.pageSize, queryState.treeMode],
-  );
+  const infiniteSignature = useMemo(() => JSON.stringify({ sortField: queryState.sortField, sortDirection: queryState.sortDirection, filters: queryState.filters ?? {}, pageSize: queryState.pageSize, treeMode: queryState.treeMode ?? false }), [queryState.sortField, queryState.sortDirection, queryState.filters, queryState.pageSize, queryState.treeMode]);
 
   const dataGenerationRef = useRef(0);
   const nextPageRef = useRef(1);
@@ -41,20 +46,13 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
   const loadedPagesRef = useRef(new Set());
 
   const requestQuery = useMemo(() => {
-    const base = {
-      sortField: queryState.sortField,
-      sortDirection: queryState.sortDirection,
-      filters: queryState.filters ?? {},
-      treeMode: queryState.treeMode ?? false,
-    };
-    if (!paginationEnabled) {
-      return { ...base, page: 1, pageSize: UNPAGED_PAGE_SIZE };
-    }
-    if (clientSidePagination) {
-      return { ...base, page: 1, pageSize: UNPAGED_PAGE_SIZE };
-    }
+    const base = { sortField: queryState.sortField, sortDirection: queryState.sortDirection, filters: queryState.filters ?? {}, treeMode: queryState.treeMode ?? false };
+    if (!paginationEnabled) return { ...base, page: 1, pageSize: UNPAGED_PAGE_SIZE };
+
+    if (clientSidePagination) return { ...base, page: 1, pageSize: UNPAGED_PAGE_SIZE };
+
     return { ...base, page: queryState.page, pageSize: queryState.pageSize };
-  }, [paginationEnabled, clientSidePagination, queryState.sortField, queryState.sortDirection, queryState.filters, queryState.treeMode, ...(paginationEnabled && !clientSidePagination ? [queryState.page, queryState.pageSize] : [])]);
+  }, [paginationEnabled, clientSidePagination, queryState.sortField, queryState.sortDirection, queryState.filters, queryState.treeMode, queryState.page, queryState.pageSize]);
 
   const rows = useMemo(() => {
     if (!clientSidePagination) return sourceRows;
@@ -79,17 +77,10 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
       setHasMore(true);
 
       try {
-        const response = await getRows({
-          sortField: queryState.sortField,
-          sortDirection: queryState.sortDirection,
-          filters: queryState.filters ?? {},
-          treeMode: queryState.treeMode ?? false,
-          page: 1,
-          pageSize: queryState.pageSize,
-        });
+        const response = await getRows({ sortField: queryState.sortField, sortDirection: queryState.sortDirection, filters: queryState.filters ?? {}, treeMode: queryState.treeMode ?? false, page: 1, pageSize: queryState.pageSize });
         if (!active || generation !== dataGenerationRef.current) return;
 
-        const chunk = response.rows ?? [];
+        const chunk = dedupeRowsByIdentity(response.rows ?? []);
         const total = response.totalCount ?? 0;
         setSourceRows(chunk);
         setTotalCount(total);
@@ -109,9 +100,7 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
 
     void loadFirstPage();
 
-    return () => {
-      active = false;
-    };
+    return () => (active = false);
   }, [mode, infiniteSignature, setTotalCount]);
 
   useEffect(() => {
@@ -163,17 +152,10 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
     setError('');
 
     try {
-      const response = await getRows({
-        sortField: queryState.sortField,
-        sortDirection: queryState.sortDirection,
-        filters: queryState.filters ?? {},
-        treeMode: queryState.treeMode ?? false,
-        page,
-        pageSize: queryState.pageSize,
-      });
+      const response = await getRows({ sortField: queryState.sortField, sortDirection: queryState.sortDirection, filters: queryState.filters ?? {}, treeMode: queryState.treeMode ?? false, page, pageSize: queryState.pageSize });
       if (generationAtStart !== dataGenerationRef.current) return;
 
-      const chunk = response.rows ?? [];
+      const chunk = dedupeRowsByIdentity(response.rows ?? []);
       const total = response.totalCount ?? 0;
       setTotalCount(total);
 
@@ -186,9 +168,9 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
 
       let nextSnapshot;
       setSourceRows((prev) => {
-        const existingIds = new Set(prev.map((row) => row.id));
-        const uniqueChunk = chunk.filter((row) => !existingIds.has(row.id));
-        nextSnapshot = [...prev, ...uniqueChunk];
+        const existingIds = new Set(prev.map((row, index) => getRowIdentity(row, index)));
+        const uniqueChunk = chunk.filter((row, index) => !existingIds.has(getRowIdentity(row, index)));
+        nextSnapshot = dedupeRowsByIdentity([...prev, ...uniqueChunk]);
         return nextSnapshot;
       });
 
@@ -205,15 +187,14 @@ export const useGridData = (queryState, setTotalCount, options = {}) => {
     }
   }, [mode, loading, loadingMore, hasMore, queryState.sortField, queryState.sortDirection, queryState.filters, queryState.treeMode, queryState.pageSize]);
 
-  const setRows = useCallback((updater) => {
-    setSourceRows((previous) => (typeof updater === 'function' ? updater(previous) : updater));
-  }, []);
+  const setRows = useCallback((updater) => setSourceRows((previous) => (typeof updater === 'function' ? updater(previous) : updater)), []);
 
   return {
     rows,
     loading,
     error,
     setRows,
+    // infinite scroll
     loadingMore: mode === 'infinite' ? loadingMore : false,
     hasMore: mode === 'infinite' ? hasMore : false,
     loadMore: mode === 'infinite' ? loadMore : () => {},

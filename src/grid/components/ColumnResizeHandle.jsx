@@ -1,8 +1,4 @@
-/**
- * Thin vertical grip on the right edge of a header cell for column width drag.
- * Double-click fits width to visible cell content (same grid root).
- */
-export function ColumnResizeHandle({ column, enabled, onResizeStart, onAutoFit }) {
+export const ColumnResizeHandle = ({ column, enabled, onResizeStart, onAutoFit }) => {
   if (!enabled) return null;
 
   return (
@@ -23,4 +19,4 @@ export function ColumnResizeHandle({ column, enabled, onResizeStart, onAutoFit }
       }}
     />
   );
-}
+};

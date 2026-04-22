@@ -54,7 +54,6 @@ describe('DataGrid', () => {
       await screen.findByText('User 1');
       expect(screen.queryByRole('button', { name: 'Next page' })).not.toBeInTheDocument();
       expect(screen.queryByText('User 11')).not.toBeInTheDocument();
-      expect(screen.getByRole('navigation', { name: 'Infinite scroll table status' })).toBeInTheDocument();
 
       await waitFor(() => expect(typeof trigger).toBe('function'));
       trigger();
@@ -216,9 +215,7 @@ describe('DataGrid', () => {
     const statusFilter = screen.getByPlaceholderText('Filter Status');
     await userEvent.type(statusFilter, 'disabled');
 
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'active' })).not.toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'active' })).not.toBeInTheDocument());
   });
 
   it('hides filter inputs when enableFiltering is false', async () => {

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { mergeColumnOrder, reorderFields } from '../utils/columnOrder';
 
-/**
- * Column display order, pinning overrides, and column drag-reorder handlers (AG-style movable headers).
- */
 export function useGridColumnOrder({ columns, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false }) {
   const [pinnedOverrides, setPinnedOverrides] = useState({});
   const isControlledColumnOrder = columnOrderProp !== undefined;
@@ -11,10 +8,8 @@ export function useGridColumnOrder({ columns, columnOrder: columnOrderProp, onCo
   const [dragOverField, setDragOverField] = useState(null);
 
   useEffect(() => {
-    if (!isControlledColumnOrder) {
-      setInternalColumnOrder((prev) => mergeColumnOrder(prev, columns));
-    }
-  }, [columns, isControlledColumnOrder]);
+    if (!isControlledColumnOrder) setInternalColumnOrder((prev) => mergeColumnOrder(prev, columns));
+  }, [isControlledColumnOrder, columns]);
 
   const displayOrder = useMemo(() => mergeColumnOrder(isControlledColumnOrder ? columnOrderProp : internalColumnOrder, columns), [isControlledColumnOrder, columnOrderProp, internalColumnOrder, columns]);
 

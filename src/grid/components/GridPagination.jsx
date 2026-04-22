@@ -31,9 +31,6 @@ const IconChevronRight = () => {
   );
 };
 
-/**
- * Enterprise-style pagination: page size, range summary, first/prev/next/last.
- */
 export const GridPagination = ({ page, totalPages, pageSize, totalCount, pageFrom, pageTo, onPageChange, onPageSizeChange, pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS }) => {
   const total = totalCount ?? 0;
   const safeTotalPages = total > 0 ? Math.max(totalPages, 1) : 1;
