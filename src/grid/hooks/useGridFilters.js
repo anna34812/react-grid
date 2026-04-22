@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchDistinctColumnValues } from '../api/gridApi';
 
 /**
- * Debounced filter draft → query, set-filter popover state, and distinct values for set filters.
+ * Header quick filter: debounced draft → query.
+ * Set ("in") filter: popover-only selection until Apply commits via setFilter.
  */
 export function useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode }) {
   const [filterDraft, setFilterDraft] = useState({});
   const [filterPopoverField, setFilterPopoverField] = useState(null);
+  /** Pending checkbox values for the open popover only; not synced to query until Apply. */
+  const [filterPopoverSelection, setFilterPopoverSelection] = useState([]);
   const [distinctByField, setDistinctByField] = useState({});
   const filterFunnelRefs = useRef({});
 
@@ -23,66 +26,66 @@ export function useGridFilters({ enableFiltering, columns, queryState, setFilter
       Object.entries(filterDraft).forEach(([field, draft]) => {
         const column = columns.find((c) => c.field === field);
         const op = draft.operator ?? column?.filterOperator ?? 'contains';
-
-        if (draft.inValues !== undefined && Array.isArray(draft.inValues)) {
-          if (draft.inValues.length === 0) {
-            setFilter(field, [], 'in');
-            return;
-          }
-          const distinct = distinctByField[field];
-          if (distinct && distinct.length > 0) {
-            const allSelected = draft.inValues.length === distinct.length && distinct.every((v) => draft.inValues.includes(v));
-            if (allSelected) {
-              const q = draft.quick ?? draft.value ?? '';
-              setFilter(field, q, op);
-              return;
-            }
-          }
-          setFilter(field, draft.inValues, 'in');
-          return;
-        }
-
         const quick = draft.quick ?? draft.value ?? '';
         setFilter(field, quick, op);
       });
     }, 300);
 
     return () => clearTimeout(debounceId);
-  }, [enableFiltering, filterDraft, setFilter, columns, distinctByField]);
+  }, [enableFiltering, filterDraft, setFilter, columns]);
 
-  const closeFilterPopover = useCallback(() => setFilterPopoverField(null), []);
-
-  const handlePopoverSelectionChange = useCallback((field, nextSelected) => {
-    setFilterDraft((previous) => {
-      const cur = previous[field] ?? { quick: '', operator: 'contains' };
-      return { ...previous, [field]: { ...cur, inValues: nextSelected } };
-    });
+  const closeFilterPopover = useCallback(() => {
+    setFilterPopoverField(null);
+    setFilterPopoverSelection([]);
   }, []);
+
+  const applyFilterPopover = useCallback(() => {
+    const field = filterPopoverField;
+    if (!field) return;
+
+    const distinct = distinctByField[field];
+    const pending = filterPopoverSelection;
+    const column = columns.find((c) => c.field === field);
+    const op = filterDraft[field]?.operator ?? column?.filterOperator ?? 'contains';
+    const quick = filterDraft[field]?.quick ?? filterDraft[field]?.value ?? '';
+
+    if (!distinct || distinct.length === 0) {
+      closeFilterPopover();
+      return;
+    }
+
+    if (pending.length === 0) {
+      setFilter(field, [], 'in');
+    } else {
+      const allSelected = pending.length === distinct.length && distinct.every((v) => pending.includes(String(v)));
+      if (allSelected) {
+        setFilter(field, quick, op);
+      } else {
+        setFilter(field, pending, 'in');
+      }
+    }
+    closeFilterPopover();
+  }, [filterPopoverField, distinctByField, filterPopoverSelection, columns, filterDraft, setFilter, closeFilterPopover]);
 
   const toggleColumnFilterPopover = useCallback(
     async (field) => {
       if (filterPopoverField === field) {
-        setFilterPopoverField(null);
+        closeFilterPopover();
         return;
       }
       const vals = await fetchDistinctColumnValues(field, { treeMode });
       setDistinctByField((p) => ({ ...p, [field]: vals }));
-      setFilterDraft((prev) => {
-        const cur = prev[field] ?? {};
-        const quick = cur.quick ?? cur.value ?? '';
-        const op = cur.operator ?? columns.find((c) => c.field === field)?.filterOperator ?? 'contains';
-        const applied = queryState.filters[field];
-        let inValues;
-        if (applied?.operator === 'in' && Array.isArray(applied.value)) {
-          inValues = applied.value.map(String);
-        } else {
-          inValues = [...vals];
-        }
-        return { ...prev, [field]: { quick, operator: op, inValues } };
-      });
+      const applied = queryState.filters[field];
+      let initialSelection;
+      if (applied?.operator === 'in' && Array.isArray(applied.value)) {
+        initialSelection = applied.value.map((v) => String(v));
+      } else {
+        initialSelection = vals.map((v) => String(v));
+      }
+      setFilterPopoverSelection(initialSelection);
       setFilterPopoverField(field);
     },
-    [filterPopoverField, columns, queryState.filters, treeMode],
+    [filterPopoverField, queryState.filters, treeMode, closeFilterPopover],
   );
 
   return {
@@ -90,11 +93,13 @@ export function useGridFilters({ enableFiltering, columns, queryState, setFilter
     setFilterDraft,
     filterPopoverField,
     setFilterPopoverField,
+    filterPopoverSelection,
+    setFilterPopoverSelection,
     distinctByField,
     setDistinctByField,
     filterFunnelRefs,
     closeFilterPopover,
-    handlePopoverSelectionChange,
+    applyFilterPopover,
     toggleColumnFilterPopover,
   };
 }

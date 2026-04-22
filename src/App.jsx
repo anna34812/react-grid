@@ -12,6 +12,7 @@ function App() {
   const [columnSizeMode, setColumnSizeMode] = useState(COLUMN_SIZE_MODE.FIT_DATA);
   const [paginationMode, setPaginationMode] = useState('server');
   const [resetPaginationTrigger, setResetPaginationTrigger] = useState(0);
+  const [loadingComponent, setLoadingComponent] = useState('Default');
 
   const onSelectionChange = useCallback(({ selectedIds, selectedRows }) => console.log({ selectedIds: selectedIds, selectedRows: selectedRows }), []);
   const onEditedRowsChange = useCallback(({ currentEditedRow, editedRows }) => console.log({ currentEditedRow: currentEditedRow, editedRows: editedRows }), []);
@@ -105,6 +106,8 @@ function App() {
     [],
   );
 
+  const MyLoad = () => <div>CustomLoading...</div>;
+
   return (
     <main className="app">
       <h1>Data Grid</h1>
@@ -129,6 +132,13 @@ function App() {
             <option value="none">None</option>
           </select>
         </label>
+        <label>
+          Loading Component
+          <select value={loadingComponent} onChange={(e) => setLoadingComponent(e.target.value)} aria-label="Loading component">
+            <option value="MyLoad">MyLoad</option>
+            <option value="Default">Default</option>
+          </select>
+        </label>
         <button type="button" onClick={() => setResetPaginationTrigger((v) => v + 1)}>
           Reset pagination
         </button>
@@ -150,6 +160,7 @@ function App() {
         enableRowDrag
         onEditedRowsChange={onEditedRowsChange}
         enableFiltering={enableFiltering}
+        LoadingComponent={loadingComponent === 'MyLoad' ? MyLoad : undefined}
       />
 
       <h2 style={{ marginTop: '2rem' }}>Tree Data</h2>

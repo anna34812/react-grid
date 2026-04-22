@@ -780,6 +780,29 @@ input[type='checkbox'].grid-checkbox:focus-visible {
   padding-bottom: 8px;
 }
 
+.column-filter-popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.column-filter-popover-apply {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+
+.column-filter-popover-apply:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
 .header-filter-input {
   box-sizing: border-box;
   width: 100%;

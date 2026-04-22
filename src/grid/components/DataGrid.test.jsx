@@ -268,6 +268,20 @@ describe('DataGrid', () => {
     expect(handles.length).toBeGreaterThan(0);
   });
 
+  it('shows default loading chip in overlay when loading with external dataSource', () => {
+    render(<DataGrid columns={columns} dataSource={[]} loading />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+  });
+
+  it('uses LoadingComponent instead of default chip when provided', () => {
+    const CustomLoading = () => <span data-testid="custom-load">Please wait</span>;
+    render(<DataGrid columns={columns} dataSource={[]} loading LoadingComponent={CustomLoading} />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-load')).toHaveTextContent('Please wait');
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+  });
+
   it('marks movable headers draggable when enableColumnReorder is true', async () => {
     const reorderColumns = columns.map((c) => ({ ...c, movable: true }));
     const { container } = render(<DataGrid columns={reorderColumns} enableColumnReorder />);

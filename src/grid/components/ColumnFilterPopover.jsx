@@ -7,7 +7,7 @@ const FilterFunnelIcon = () => (
   </svg>
 );
 
-export const ColumnFilterPopover = ({ isOpen, onClose, anchorEl, label, distinctValues, selectedValues, onChange }) => {
+export const ColumnFilterPopover = ({ isOpen, onClose, onApply, anchorEl, label, distinctValues, selectedValues, onChange }) => {
   const popoverRef = useRef(null);
   const selectAllRef = useRef(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -20,11 +20,11 @@ export const ColumnFilterPopover = ({ isOpen, onClose, anchorEl, label, distinct
   const filteredList = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
     if (!q) return distinctValues;
-    return distinctValues.filter((v) => v.toLowerCase().includes(q));
+    return distinctValues.filter((v) => String(v).toLowerCase().includes(q));
   }, [distinctValues, listSearch]);
 
-  const allFilteredSelected = filteredList.length > 0 && filteredList.every((v) => selectedValues.includes(v));
-  const someFilteredSelected = filteredList.some((v) => selectedValues.includes(v));
+  const allFilteredSelected = filteredList.length > 0 && filteredList.every((v) => selectedValues.includes(String(v)));
+  const someFilteredSelected = filteredList.some((v) => selectedValues.includes(String(v)));
 
   useEffect(() => {
     const el = selectAllRef.current;
@@ -32,17 +32,16 @@ export const ColumnFilterPopover = ({ isOpen, onClose, anchorEl, label, distinct
   }, [someFilteredSelected, allFilteredSelected]);
 
   const toggleAllFiltered = useCallback(() => {
-    if (allFilteredSelected) {
-      onChange(selectedValues.filter((v) => !filteredList.includes(v)));
-    } else {
-      onChange([...new Set([...selectedValues, ...filteredList])]);
-    }
+    const filteredStr = filteredList.map((v) => String(v));
+    if (allFilteredSelected) onChange(selectedValues.filter((v) => !filteredStr.includes(v)));
+    else onChange([...new Set([...selectedValues, ...filteredStr])]);
   }, [allFilteredSelected, filteredList, onChange, selectedValues]);
 
   const toggleOne = useCallback(
     (value) => {
-      if (selectedValues.includes(value)) onChange(selectedValues.filter((v) => v !== value));
-      else onChange([...selectedValues, value]);
+      const id = String(value);
+      if (selectedValues.includes(id)) onChange(selectedValues.filter((v) => v !== id));
+      else onChange([...selectedValues, id]);
     },
     [onChange, selectedValues],
   );
@@ -61,12 +60,21 @@ export const ColumnFilterPopover = ({ isOpen, onClose, anchorEl, label, distinct
     };
     const onKey = (e) => e.key === 'Escape' && onClose();
 
+    /** Close on any scroll outside the popover (page, grid panes, etc.); keep open when scrolling the value list inside. */
+    const closeOnScrollCapture = (e) => {
+      const t = e.target;
+      if (t instanceof Node && popoverRef.current?.contains(t)) return;
+      onClose();
+    };
+
     document.addEventListener('mousedown', closeOnOutside);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('scroll', closeOnScrollCapture, true);
 
     return () => {
       document.removeEventListener('mousedown', closeOnOutside);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('scroll', closeOnScrollCapture, true);
     };
   }, [isOpen, onClose, anchorEl]);
 
@@ -86,11 +94,16 @@ export const ColumnFilterPopover = ({ isOpen, onClose, anchorEl, label, distinct
           <span>(Select All)</span>
         </label>
         {filteredList.map((value) => (
-          <label key={value} className="column-filter-popover-row">
-            <input type="checkbox" checked={selectedValues.includes(value)} onChange={() => toggleOne(value)} />
+          <label key={String(value)} className="column-filter-popover-row">
+            <input type="checkbox" checked={selectedValues.includes(String(value))} onChange={() => toggleOne(value)} />
             <span>{value}</span>
           </label>
         ))}
+      </div>
+      <div className="column-filter-popover-footer">
+        <button type="button" className="column-filter-popover-apply" onClick={() => onApply?.()}>
+          Apply
+        </button>
       </div>
     </div>
   );

@@ -3,13 +3,16 @@ import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from '../utils/gridTemplat
 import { useDataGridController } from '../hooks/useDataGridController';
 import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
+import { RowDragCell } from './RowDragCell';
+import { InfiniteScrollLoadingRow } from './InfiniteScrollLoadingRow';
+import { GridLoadingOverlay } from './GridLoadingOverlay';
 import { GridPagination } from './GridPagination';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
-export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA }) => {
+export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA, LoadingComponent }) => {
   const {
     queryState,
     totalPages,
@@ -77,7 +80,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
     columnSizeMode,
   });
   const { rs, selectedSet, selectionEnabled, showSelectColumn, enableClickSelection, leftColumns, centerColumns, rightColumns, hasSplit, selectionPane, leadingPane, toggleRowSelection, toggleSelectAllInView, allSelectedInView, someSelectedInView, applySelectionForRowClick, handleRowBackgroundClick, editableClickSelectionTimerRef } = selectionState;
-  const { filterDraft, setFilterDraft, filterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = filterState;
+  const { filterDraft, setFilterDraft, filterPopoverField, filterPopoverSelection, setFilterPopoverSelection, distinctByField, filterFunnelRefs, closeFilterPopover, applyFilterPopover, toggleColumnFilterPopover } = filterState;
 
   const renderCell = (row, column) => {
     const isEditing = editingCell?.rowId === row.id && editingCell?.field === column.field;
@@ -154,6 +157,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
         aria-disabled={isSaving}
         onClick={(e) => {
           e.stopPropagation();
+
           if (!enableClickSelection || isSaving) return;
           if (e.detail >= 2) return;
           if (editableClickSelectionTimerRef.current) clearTimeout(editableClickSelectionTimerRef.current);
@@ -195,15 +199,12 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
     return { minWidth: Math.max(minW, w) };
   };
 
-  /** When a subset "in" filter is active, show count + value list (width-fitted) and funnel badge. */
   const getSetFilterSummary = (field) => {
     const distinct = distinctByField[field];
-    const draft = filterDraft[field];
     const applied = queryState.filters[field];
 
     let values = null;
-    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) values = draft.inValues.map(String);
-    else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) values = applied.value.map(String);
+    if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) values = applied.value.map(String);
 
     if (!values || values.length === 0) return { isActive: false };
 
@@ -219,12 +220,8 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
   const renderSectionGrid = (sectionColumns, pane) => {
     if (sectionColumns.length === 0) return null;
     const isInfiniteScrollPane = paginationMode === 'infinite' && pane === verticalScrollMasterPane;
-    const setScrollRef = (node) => {
-      if (pane === 'left' || pane === 'right') paneScrollRefs.current[pane] = node;
-    };
-    const setBodyScrollRef = (node) => {
-      if (isInfiniteScrollPane) infiniteScrollRootRef.current = node;
-    };
+    const setScrollRef = (node) => (pane === 'left' || pane === 'right') && (paneScrollRefs.current[pane] = node);
+    const setBodyScrollRef = (node) => isInfiniteScrollPane && (infiniteScrollRootRef.current = node);
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
@@ -237,6 +234,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
           <div className={['data-grid', resizingField ? 'data-grid--column-resizing' : ''].filter(Boolean).join(' ') || undefined} data-column-size-mode={columnSizeMode} role="grid" aria-rowcount={displayRows.length} aria-colcount={ariaColCount}>
             <div className="data-grid-header" role="presentation">
               <div className="data-grid-header-row" role="row" {...(hasSplit ? { 'data-sync-header': '' } : {})} style={{ gridTemplateColumns: colTpl }}>
+                {/* row drag header */}
                 {showLeadingRowDrag ? (
                   <div role="columnheader" className="data-grid-header-cell grid-row-drag-header" aria-label="Reorder rows" style={{ width: 36, minWidth: 36 }} data-field="__rowDrag__">
                     <div className="header-stack">
@@ -246,6 +244,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                     </div>
                   </div>
                 ) : null}
+                {/* select header */}
                 {showLeadingSelect ? (
                   <div role="columnheader" className="data-grid-header-cell grid-select-header" style={{ width: 44, minWidth: 44 }} data-field="__select__">
                     {enableFiltering ? (
@@ -260,6 +259,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                     )}
                   </div>
                 ) : null}
+                {/* column headers */}
                 {sectionColumns.map((column) => {
                   const isSorted = queryState.sortField === column.field;
                   const direction = isSorted ? queryState.sortDirection : null;
@@ -290,6 +290,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                       onDragLeave={enableColumnReorder ? (e) => !e.currentTarget.contains(e.relatedTarget) && setDragOverField(null) : undefined}
                       onDropCapture={enableColumnReorder ? (e) => handleColumnDrop(e, column.field) : undefined}
                     >
+                      {/* column header content */}
                       {enableFiltering ? (
                         <div className="header-stack">
                           <div className="header-cell header-cell--title-row">
@@ -298,9 +299,6 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                               {direction === 'asc' && ' \u2191'}
                               {direction === 'desc' && ' \u2193'}
                             </button>
-                            {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
-                              ⋮
-                            </button> */}
                             <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
                               <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
                                 L
@@ -329,23 +327,13 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                                         onChange={(event) => {
                                           const value = event.target.value;
                                           const operator = column.filterOperator || 'contains';
-                                          setFilterDraft((previous) => ({
-                                            ...previous,
-                                            [column.field]: {
-                                              quick: value,
-                                              operator,
-                                              inValues: undefined,
-                                            },
-                                          }));
+                                          setFilterDraft((previous) => ({ ...previous, [column.field]: { quick: value, operator, inValues: undefined } }));
                                         }}
                                       />
                                     )}
                                     <button
                                       type="button"
-                                      ref={(el) => {
-                                        if (el) filterFunnelRefs.current[column.field] = el;
-                                        else delete filterFunnelRefs.current[column.field];
-                                      }}
+                                      ref={(el) => (el ? (filterFunnelRefs.current[column.field] = el) : delete filterFunnelRefs.current[column.field])}
                                       className={['header-filter-funnel', filterPopoverField === column.field ? 'header-filter-funnel--open' : '', setSummary.isActive ? 'header-filter-funnel--active' : ''].filter(Boolean).join(' ')}
                                       aria-label={`Filter options for ${column.label}`}
                                       aria-expanded={filterPopoverField === column.field}
@@ -372,9 +360,6 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                             {direction === 'asc' && ' \u2191'}
                             {direction === 'desc' && ' \u2193'}
                           </button>
-                          {/* <button type='button' className='header-column-menu-btn' aria-label={`${column.label} column menu`} title='Column menu'>
-                            ⋮
-                          </button> */}
                           <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
                             <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
                               L
@@ -417,23 +402,9 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                       onDragLeave={enableRowDrag ? (e) => !e.currentTarget.contains(e.relatedTarget) && setDragOverRowId(null) : undefined}
                       onDropCapture={enableRowDrag ? (e) => handleRowDrop(e, row.id) : undefined}
                     >
-                      {showLeadingRowDrag ? (
-                        <div role="gridcell" className="data-grid-cell grid-row-drag-cell" data-field="__rowDrag__" data-no-row-select>
-                          <button
-                            type="button"
-                            className="row-drag-handle"
-                            draggable
-                            aria-label={`Reorder row ${row.id}`}
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/x-data-grid-row-id', String(row.id));
-                              e.dataTransfer.effectAllowed = 'move';
-                            }}
-                            onDragEnd={() => setDragOverRowId(null)}
-                          >
-                            ⠿
-                          </button>
-                        </div>
-                      ) : null}
+                      {/* row drag cell */}
+                      {showLeadingRowDrag ? <RowDragCell rowId={row.id} onDragEnd={() => setDragOverRowId(null)} /> : null}
+                      {/* select cell */}
                       {showLeadingSelect ? (
                         <div role="gridcell" className="data-grid-cell grid-select-cell" data-field="__select__" data-no-row-select>
                           <input className="grid-checkbox" type="checkbox" checked={rowSelected} onChange={() => toggleRowSelection(row.id)} onClick={(e) => e.stopPropagation()} aria-label={`Select row ${row.id}`} />
@@ -447,20 +418,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                     </div>
                   );
                 })}
-                {paginationMode === 'infinite' && gridLoadingMore ? (
-                  <div role="row" className="data-grid-row data-grid-row--loading" style={{ gridTemplateColumns: colTpl }}>
-                    <div role="gridcell" className={`data-grid-cell data-grid-cell--loading ${pane === 'center' ? 'data-grid-cell--loading-primary' : 'data-grid-cell--loading-peer'}`} style={{ gridColumn: '1 / -1' }} aria-hidden={pane === 'center' ? undefined : true}>
-                      {pane === 'center' ? (
-                        <>
-                          <span className="grid-loading-spinner" aria-hidden />
-                          <span className="grid-infinite-loading-row__text">One moment please…</span>
-                        </>
-                      ) : (
-                        <span className="grid-infinite-loading-row__peer-fill" aria-hidden />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
+                {paginationMode === 'infinite' && gridLoadingMore ? <InfiniteScrollLoadingRow gridTemplateColumns={colTpl} pane={pane} /> : null}
               </div>
               {isInfiniteScrollPane ? <div ref={infiniteSentinelRef} className="grid-infinite-sentinel" aria-hidden /> : null}
             </div>
@@ -477,14 +435,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
       {editError && <p className="status error">{editError}</p>}
 
       <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
-        {controlledLoading ? (
-          <div className="grid-loading-overlay" role="status" aria-live="polite">
-            <div className="grid-loading-chip">
-              <span className="grid-loading-spinner" aria-hidden />
-              <span>Loading...</span>
-            </div>
-          </div>
-        ) : null}
+        {controlledLoading ? <GridLoadingOverlay LoadingComponent={LoadingComponent} /> : null}
         <div className="grid-split-row" ref={gridSplitRowRef}>
           {renderSectionGrid(leftColumns, 'left')}
           {renderSectionGrid(centerColumns, 'center')}
@@ -492,9 +443,10 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
         </div>
       </div>
 
+      {/* pagination */}
       {paginationMode === 'server' || paginationMode === 'client' ? <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} /> : null}
-
-      {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterDraft[filterPopoverField]?.inValues ?? []} onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)} /> : null}
+      {/* filter popover */}
+      {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} onApply={applyFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterPopoverSelection} onChange={setFilterPopoverSelection} /> : null}
     </div>
   );
 };

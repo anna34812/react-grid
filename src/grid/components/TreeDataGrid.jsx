@@ -17,6 +17,7 @@ import { useGridColumnResize } from '../hooks/useGridColumnResize';
 import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
+import { GridLoadingOverlay } from './GridLoadingOverlay';
 
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
@@ -28,7 +29,7 @@ export const TreeDataGrid = (props) => {
   const { columns, dataSource, treeData: treeDataConfig, rowSelection: rowSelectionProp, onSelectionChange, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA } = props;
   const { columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false } = props;
   const { onEditedRowsChange = () => {} } = props;
-  const { enableFiltering = true } = props;
+  const { enableFiltering = true, LoadingComponent } = props;
 
   const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
@@ -246,7 +247,7 @@ export const TreeDataGrid = (props) => {
   const someSelectedVisible = someSelectedInView;
   const toggleSelectAllVisible = toggleSelectAllInView;
 
-  const { filterDraft, setFilterDraft, filterPopoverField, distinctByField, filterFunnelRefs, closeFilterPopover, handlePopoverSelectionChange, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: true });
+  const { filterDraft, setFilterDraft, filterPopoverField, filterPopoverSelection, setFilterPopoverSelection, distinctByField, filterFunnelRefs, closeFilterPopover, applyFilterPopover, toggleColumnFilterPopover } = useGridFilters({ enableFiltering, columns, queryState, setFilter, clearFilters, treeMode: true });
 
   useGridEditFocus(editingCell);
   const verticalScrollMasterPane = hasSplit && rightColumns.length > 0 ? 'right' : 'center';
@@ -478,12 +479,10 @@ export const TreeDataGrid = (props) => {
   /** When a subset "in" filter is active, show count + value list (width-fitted) and funnel badge. */
   const getSetFilterSummary = (field) => {
     const distinct = distinctByField[field];
-    const draft = filterDraft[field];
     const applied = queryState.filters[field];
 
     let values = null;
-    if (draft?.inValues !== undefined && Array.isArray(draft.inValues)) values = draft.inValues.map(String);
-    else if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) values = applied.value.map(String);
+    if (applied?.operator === 'in' && Array.isArray(applied.value) && applied.value.length > 0) values = applied.value.map(String);
 
     if (!values || values.length === 0) return { isActive: false };
 
@@ -748,14 +747,7 @@ export const TreeDataGrid = (props) => {
       {!gridLoading && !hasRows && <p className="status">No rows found.</p>}
 
       <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
-        {gridLoading ? (
-          <div className="grid-loading-overlay" role="status" aria-live="polite">
-            <div className="grid-loading-chip">
-              <span className="grid-loading-spinner" aria-hidden />
-              <span>Loading...</span>
-            </div>
-          </div>
-        ) : null}
+        {gridLoading ? <GridLoadingOverlay LoadingComponent={LoadingComponent} /> : null}
         <div className="grid-split-row" ref={gridSplitRowRef}>
           {renderSectionGrid(leftColumns, 'left')}
           {renderSectionGrid(centerColumns, 'center')}
@@ -763,7 +755,18 @@ export const TreeDataGrid = (props) => {
         </div>
       </div>
 
-      {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterDraft[filterPopoverField]?.inValues ?? []} onChange={(next) => handlePopoverSelectionChange(filterPopoverField, next)} /> : null}
+      {filterPopoverField ? (
+        <ColumnFilterPopover
+          isOpen
+          onClose={closeFilterPopover}
+          onApply={applyFilterPopover}
+          anchorEl={filterFunnelRefs.current[filterPopoverField]}
+          label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField}
+          distinctValues={distinctByField[filterPopoverField] ?? []}
+          selectedValues={filterPopoverSelection}
+          onChange={setFilterPopoverSelection}
+        />
+      ) : null}
     </div>
   );
 };
