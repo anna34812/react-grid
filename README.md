@@ -58,3 +58,10 @@ The package root exports:
 - `TreeDataGrid`
 - `DEFAULT_ROW_SELECTION`
 - `COLUMN_SIZE_MODE`
+
+## Peer dependencies
+
+This library expects React to be provided by the consumer app.
+
+- `react` `>=18 <20`
+- `react-dom` `>=18 <20`
