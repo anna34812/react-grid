@@ -1,3 +1,5 @@
+import React from 'react';
+
 const ROW_DRAG_MIME = 'application/x-data-grid-row-id';
 
 export const RowDragCell = ({ rowId, onDragEnd }) => (

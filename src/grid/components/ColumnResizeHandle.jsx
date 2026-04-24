@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const ColumnResizeHandle = ({ column, enabled, onResizeStart, onAutoFit }) => {
   if (!enabled) return null;
 

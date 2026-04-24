@@ -1,3 +1,4 @@
+import React from 'react';
 import { getColumnMinWidth, getEffectivePin, isColumnResizable } from '../utils/columnPinning';
 import { buildGridTemplateColumns, COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 import { useDataGridController } from '../hooks/useDataGridController';
