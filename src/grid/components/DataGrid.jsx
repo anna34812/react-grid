@@ -6,13 +6,14 @@ import { ColumnResizeHandle } from './ColumnResizeHandle';
 import { RowDragCell } from './RowDragCell';
 import { InfiniteScrollLoadingRow } from './InfiniteScrollLoadingRow';
 import { GridLoadingOverlay } from './GridLoadingOverlay';
+import { GridEmptyState } from './GridEmptyState';
 import { GridPagination } from './GridPagination';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
-export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA, LoadingComponent }) => {
+export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA, LoadingComponent, EmptyComponent }) => {
   const {
     queryState,
     totalPages,
@@ -227,6 +228,8 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
     const showLeadingRowDrag = enableRowDrag && leadingPane === pane;
     const colTpl = buildGridTemplateColumns(sectionColumns, { showRowDrag: showLeadingRowDrag, showSelect: showLeadingSelect, columnWidths, columnSizeMode });
     const ariaColCount = sectionColumns.length + (showLeadingSelect ? 1 : 0) + (showLeadingRowDrag ? 1 : 0);
+    const emptyMessagePane = centerColumns.length > 0 ? 'center' : leftColumns.length > 0 ? 'left' : rightColumns.length > 0 ? 'right' : null;
+    const showEmptyBodyRow = !controlledLoading && !hasRows && emptyMessagePane != null && pane === emptyMessagePane;
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
@@ -377,7 +380,14 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
               </div>
             </div>
             <div ref={setBodyScrollRef} className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
-              <div className="data-grid-body" role="rowgroup">
+              <div className={['data-grid-body', showEmptyBodyRow && 'data-grid-body--empty-surface'].filter(Boolean).join(' ') || undefined} role="rowgroup">
+                {showEmptyBodyRow ? (
+                  <div role="row" className="data-grid-row data-grid-row--empty" style={{ gridTemplateColumns: colTpl }}>
+                    <div role="gridcell" className="data-grid-cell data-grid-body-empty-cell" style={{ gridColumn: '1 / -1' }}>
+                      <GridEmptyState EmptyComponent={EmptyComponent} />
+                    </div>
+                  </div>
+                ) : null}
                 {displayRows.map((row, rowIndex) => {
                   const rowSelected = selectedSet.has(row.id);
                   const rowDragOver = enableRowDrag && dragOverRowId === row.id;
@@ -430,8 +440,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
   };
 
   return (
-    <div className="grid-container" ref={gridMeasureRootRef}>
-      {!controlledLoading && !hasRows && <p className="status">No rows found.</p>}
+    <div className={['grid-container', !hasRows && 'grid-container--empty-data'].filter(Boolean).join(' ') || undefined} ref={gridMeasureRootRef}>
       {editError && <p className="status error">{editError}</p>}
 
       <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
@@ -445,6 +454,7 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
 
       {/* pagination */}
       {paginationMode === 'server' || paginationMode === 'client' ? <GridPagination page={queryState.page} totalPages={totalPages} pageSize={queryState.pageSize} totalCount={queryState.totalCount} pageFrom={pageFrom} pageTo={pageTo} onPageChange={setPage} onPageSizeChange={setPageSize} /> : null}
+
       {/* filter popover */}
       {filterPopoverField ? <ColumnFilterPopover isOpen onClose={closeFilterPopover} onApply={applyFilterPopover} anchorEl={filterFunnelRefs.current[filterPopoverField]} label={columns.find((c) => c.field === filterPopoverField)?.label ?? filterPopoverField} distinctValues={distinctByField[filterPopoverField] ?? []} selectedValues={filterPopoverSelection} onChange={setFilterPopoverSelection} /> : null}
     </div>

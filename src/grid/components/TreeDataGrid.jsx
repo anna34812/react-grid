@@ -18,6 +18,7 @@ import { ColumnFilterPopover, FilterFunnelIcon } from './ColumnFilterPopover';
 import { ColumnResizeHandle } from './ColumnResizeHandle';
 import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 import { GridLoadingOverlay } from './GridLoadingOverlay';
+import { GridEmptyState } from './GridEmptyState';
 
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
@@ -29,7 +30,7 @@ export const TreeDataGrid = (props) => {
   const { columns, dataSource, treeData: treeDataConfig, rowSelection: rowSelectionProp, onSelectionChange, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA } = props;
   const { columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false } = props;
   const { onEditedRowsChange = () => {} } = props;
-  const { enableFiltering = true, LoadingComponent } = props;
+  const { enableFiltering = true, LoadingComponent, EmptyComponent } = props;
 
   const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
@@ -501,6 +502,8 @@ export const TreeDataGrid = (props) => {
 
     const showLeadingSelect = showSelectColumn && selectionPane === pane;
     const colTpl = buildGridTemplateColumns(sectionColumns, { showSelect: showLeadingSelect, columnWidths, columnSizeMode });
+    const emptyMessagePane = centerColumns.length > 0 ? 'center' : leftColumns.length > 0 ? 'left' : rightColumns.length > 0 ? 'right' : null;
+    const showEmptyBodyRow = !gridLoading && !hasRows && emptyMessagePane != null && pane === emptyMessagePane;
 
     return (
       <div className={`grid-pane grid-pane--${pane}`} data-pane={pane}>
@@ -644,7 +647,14 @@ export const TreeDataGrid = (props) => {
               </div>
             </div>
             <div className={['grid-pane-body-scroll', pane === verticalScrollMasterPane ? 'grid-pane-scroll--y-master' : ''].filter(Boolean).join(' ')}>
-              <div className="tree-data-grid-body" role="rowgroup">
+              <div className={['tree-data-grid-body', showEmptyBodyRow && 'tree-data-grid-body--empty-surface'].filter(Boolean).join(' ') || undefined} role="rowgroup">
+                {showEmptyBodyRow ? (
+                  <div role="row" className="tree-data-grid-row data-grid-row--empty" style={{ gridTemplateColumns: colTpl }}>
+                    <div role="gridcell" className="tree-grid-cell data-grid-body-empty-cell" style={{ gridColumn: '1 / -1' }}>
+                      <GridEmptyState EmptyComponent={EmptyComponent} />
+                    </div>
+                  </div>
+                ) : null}
                 {flattenedRows.map((row, rowIndex) => {
                   const rid = row[treeRowIdField];
                   const subtreeIds = groupSelection === 'descendants' && (childrenMap.get(rid)?.length ?? 0) > 0 ? collectSubtreeIds(rid, childrenMap) : [rid];
@@ -730,7 +740,7 @@ export const TreeDataGrid = (props) => {
   };
 
   return (
-    <div className="grid-container" ref={gridMeasureRootRef}>
+    <div className={['grid-container', !hasRows && 'grid-container--empty-data'].filter(Boolean).join(' ') || undefined} ref={gridMeasureRootRef}>
       {showSelectColumn && rs.mode === 'multi' && treeDataConfig.showGroupSelectionControl !== false ? (
         <div className="tree-grid-group-selection-toolbar">
           <label className="tree-grid-group-selection-label">
@@ -744,8 +754,6 @@ export const TreeDataGrid = (props) => {
       ) : null}
       {gridError && <p className="status error">{gridError}</p>}
       {editError && <p className="status error">{editError}</p>}
-      {!gridLoading && !hasRows && <p className="status">No rows found.</p>}
-
       <div className={`grid-split-root${hasSplit ? ' grid-split-root--split' : ''}`}>
         {gridLoading ? <GridLoadingOverlay LoadingComponent={LoadingComponent} /> : null}
         <div className="grid-split-row" ref={gridSplitRowRef}>

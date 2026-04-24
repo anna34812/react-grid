@@ -195,6 +195,52 @@
   background: #fff;
 }
 
+/* No rows: keep a usable body height; flex so the empty placeholder can fill and center like a full table body. */
+.grid-container--empty-data .grid-pane-body-scroll {
+  min-height: min(360px, 65vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.data-grid-body.data-grid-body--empty-surface,
+.tree-data-grid-body.tree-data-grid-body--empty-surface {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.data-grid-body--empty-surface > .data-grid-row--empty,
+.tree-data-grid-body--empty-surface > .tree-data-grid-row.data-grid-row--empty {
+  min-height: 0;
+}
+
+.data-grid-body-empty-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.data-grid-row--empty .data-grid-body-empty-cell {
+  border-right: none;
+  border-bottom: none;
+}
+
+.tree-data-grid-body--empty-surface > .tree-data-grid-row.data-grid-row--empty {
+  border-bottom: none;
+}
+
+.grid-empty-default-message {
+  margin: 0;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+}
+
 .grid-toolbar {
   display: flex;
   gap: 12px;

@@ -13,6 +13,7 @@ function App() {
   const [paginationMode, setPaginationMode] = useState('server');
   const [resetPaginationTrigger, setResetPaginationTrigger] = useState(0);
   const [loadingComponent, setLoadingComponent] = useState('Default');
+  const [emptyComponent, setEmptyComponent] = useState('Default');
 
   const onSelectionChange = useCallback(({ selectedIds, selectedRows }) => console.log({ selectedIds: selectedIds, selectedRows: selectedRows }), []);
   const onEditedRowsChange = useCallback(({ currentEditedRow, editedRows }) => console.log({ currentEditedRow: currentEditedRow, editedRows: editedRows }), []);
@@ -25,6 +26,7 @@ function App() {
     const json = await res.json();
 
     const data = startRow === 1 ? json.products.map((m) => ({ ...m, description: 'test' })) : json.products;
+    return { rows: [], total: 0 };
     return { rows: data, total: json.total };
   }, []);
 
@@ -136,6 +138,13 @@ function App() {
           Loading Component
           <select value={loadingComponent} onChange={(e) => setLoadingComponent(e.target.value)} aria-label="Loading component">
             <option value="MyLoad">MyLoad</option>
+            <option value="Default">Default</option>
+          </select>
+        </label>
+        <label>
+          Empty Component
+          <select value={emptyComponent} onChange={(e) => setEmptyComponent(e.target.value)} aria-label="Empty component">
+            <option value="MyEmpty">MyEmpty</option>
             <option value="Default">Default</option>
           </select>
         </label>

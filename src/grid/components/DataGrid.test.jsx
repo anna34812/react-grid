@@ -282,6 +282,22 @@ describe('DataGrid', () => {
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
 
+  it('shows default empty message when external dataSource has no rows', () => {
+    render(<DataGrid columns={columns} dataSource={[]} />);
+    expect(screen.getByText('No Rows To Show')).toBeInTheDocument();
+  });
+
+  it('uses EmptyComponent instead of default empty message when provided', () => {
+    const CustomEmpty = () => (
+      <p className="status" data-testid="custom-empty">
+        Nothing here
+      </p>
+    );
+    render(<DataGrid columns={columns} dataSource={[]} EmptyComponent={CustomEmpty} />);
+    expect(screen.getByTestId('custom-empty')).toHaveTextContent('Nothing here');
+    expect(screen.queryByText('No Rows To Show')).not.toBeInTheDocument();
+  });
+
   it('marks movable headers draggable when enableColumnReorder is true', async () => {
     const reorderColumns = columns.map((c) => ({ ...c, movable: true }));
     const { container } = render(<DataGrid columns={reorderColumns} enableColumnReorder />);
