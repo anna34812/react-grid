@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const InfiniteScrollLoadingRow = ({ gridTemplateColumns, pane }) => (
   <div role="row" className="data-grid-row data-grid-row--loading" style={{ gridTemplateColumns }}>
     <div

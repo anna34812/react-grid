@@ -1,8 +1,11 @@
 {
   "name": "react-data-grid",
-  "private": true,
-  "version": "0.0.0",
+  "private": false,
+  "version": "1.0.0",
   "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,8 +15,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20",
+    "react-dom": ">=18 <20"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -29,6 +34,8 @@
     "globals": "^17.4.0",
     "jsdom": "^29.0.2",
     "prettier": "^3.8.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "vite": "^8.0.4",
     "vitest": "^4.1.4"
   }

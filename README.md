@@ -1,16 +1,67 @@
-# React + Vite
+# react-data-grid
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project can be consumed directly from a Git repository without publishing to npm.
 
-Currently, two official plugins are available:
+## Install from Git repository
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Add the dependency to your consumer project's `package.json`:
 
-## React Compiler
+```json
+{
+  "dependencies": {
+    "my-lib": "git+https://github.com/company/my-lib.git#v1.0.0"
+  }
+}
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Use one of these refs:
 
-## Expanding the ESLint configuration
+- `#v1.0.0`: install a tag (recommended for stable release)
+- `#package`: install a branch
+- `#<commit-sha>`: install a specific commit
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Example for this repository:
+
+```json
+{
+  "dependencies": {
+    "react-data-grid": "git+https://github.com/<org>/<repo>.git#package"
+  }
+}
+```
+
+Then run:
+
+```bash
+npm install
+```
+
+## Package branch workflow
+
+Use the `package` branch as the install target for internal consumers.
+
+1. Work and test changes in this repository.
+2. Merge or commit library-ready changes into `package`.
+3. (Optional but recommended) Create a tag such as `v1.0.1` on `package`.
+4. In consumer projects, install using one of:
+   - branch: `git+https://github.com/<org>/<repo>.git#package`
+   - tag: `git+https://github.com/<org>/<repo>.git#v1.0.1`
+
+For production-like stability, prefer tag refs over branch refs.
+
+## Exports
+
+The package root exports:
+
+- `IXGrid` (default integrated grid component)
+- `DataGrid`
+- `TreeDataGrid`
+- `DEFAULT_ROW_SELECTION`
+- `COLUMN_SIZE_MODE`
+
+## Peer dependencies
+
+This library expects React to be provided by the consumer app.
+
+- `react` `>=18 <20`
+- `react-dom` `>=18 <20`

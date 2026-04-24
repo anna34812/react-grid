@@ -1,3 +1,5 @@
+import React from 'react';
+
 const DefaultLoadingContent = () => (
   <div className="grid-loading-chip">
     <span className="grid-loading-spinner" aria-hidden />

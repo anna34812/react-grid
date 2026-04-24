@@ -1,3 +1,4 @@
+import React from 'react';
 import { COLUMN_SIZE_MODE, DataGrid, DEFAULT_ROW_SELECTION } from './DataGrid';
 import { TreeDataGrid } from './TreeDataGrid';
 
