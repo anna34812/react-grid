@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { DEFAULT_ROW_SELECTION, COLUMN_SIZE_MODE } from './grid/components/DataGrid';
+import { COLUMN_SIZE_MODE } from './grid/components/DataGrid';
 import { formatBytes } from './grid/utils/treeData';
 import IXGrid from './grid/components/IXGrid';
 import { mockRows } from './grid/mock/data';
@@ -160,8 +160,7 @@ function App() {
         paginationMode={paginationMode}
         // resetPaginationOptions={{ page: 1 }}
         resetPaginationTrigger={resetPaginationTrigger}
-        // selection
-        rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }}
+        // rowSelection={{ mode: 'single', checkboxes: true, enableClickSelection: false }}
         onSelectionChange={onSelectionChange}
         //
         columnSizeMode={columnSizeMode}
@@ -173,19 +172,7 @@ function App() {
       />
 
       <h2 style={{ marginTop: '2rem' }}>Tree Data</h2>
-      <IXGrid
-        treeData={{ config: treeDataConfig }}
-        dataSource={treeFlatRows}
-        columnSizeMode={columnSizeMode}
-        paginationMode={paginationMode}
-        columns={treeColumns}
-        enableColumnReorder
-        enableRowDrag
-        rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }}
-        onSelectionChange={onSelectionChange}
-        onEditedRowsChange={onEditedRowsChange}
-        enableFiltering={enableFiltering}
-      />
+      <IXGrid treeData={{ config: treeDataConfig }} dataSource={treeFlatRows} columnSizeMode={columnSizeMode} paginationMode={paginationMode} columns={treeColumns} enableColumnReorder enableRowDrag onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
     </main>
   );
 }

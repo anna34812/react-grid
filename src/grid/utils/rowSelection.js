@@ -1,4 +1,4 @@
-/** Merged with `rowSelection` from props; spread this in the app for partial overrides. */
+/** Base defaults merged inside the grid via `mergeRowSelection`. Override with the `rowSelection` prop only. */
 export const DEFAULT_ROW_SELECTION = { mode: 'none', checkboxes: true, enableClickSelection: false, selectedIds: undefined, defaultSelectedIds: undefined };
 
 export const mergeRowSelection = (partial) => {

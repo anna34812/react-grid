@@ -1,12 +1,17 @@
-import React from 'react';
-import { COLUMN_SIZE_MODE, DataGrid, DEFAULT_ROW_SELECTION } from './DataGrid';
+import React, { useMemo } from 'react';
+import { COLUMN_SIZE_MODE, DataGrid } from './DataGrid';
 import { TreeDataGrid } from './TreeDataGrid';
+import { mergeRowSelection } from '../utils/rowSelection';
+
+/** Applied when `rowSelection` is omitted or partially overridden on `IXGrid`. */
+const IXGRID_ROW_SELECTION_DEFAULTS = { mode: 'multi', checkboxes: true, enableClickSelection: false };
 
 const IXGrid = (props) => {
   const { columns, dataSource, fetchData, treeData = false, onReady, onQueryChange = () => {}, loading = false } = props;
   const { resetPaginationTrigger } = props;
   const { paginationMode = 'server' } = props; // pagination
-  const { rowSelection = { ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }, onSelectionChange = () => {} } = props;
+  const { rowSelection: rowSelectionProp, onSelectionChange = () => {} } = props;
+  const rowSelection = useMemo(() => mergeRowSelection({ ...IXGRID_ROW_SELECTION_DEFAULTS, ...rowSelectionProp }), [rowSelectionProp]);
   const { columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA } = props; // column size mode
   const { enableColumnReorder = false, enableRowDrag = false, onEditedRowsChange = () => {}, enableFiltering = true, enableColumnPinning = false, LoadingComponent, EmptyComponent } = props;
 
