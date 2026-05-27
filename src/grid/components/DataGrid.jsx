@@ -14,7 +14,7 @@ import { SetFilterSummaryReadonlyInput } from './SetFilterSummaryReadonlyInput';
 export { DEFAULT_ROW_SELECTION } from '../utils/rowSelection';
 export { COLUMN_SIZE_MODE } from '../utils/gridTemplateColumns';
 
-export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA, LoadingComponent, EmptyComponent }) => {
+export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp = false, onReady, onQueryChange, resetPaginationTrigger, columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false, enableRowDrag = false, onRowOrderChange, rowSelection: rowSelectionProp, onSelectionChange, onEditedRowsChange, enableFiltering = true, enableColumnPinning = false, enableColumnResize = true, paginationMode = 'server', columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA, LoadingComponent, EmptyComponent }) => {
   const {
     queryState,
     totalPages,
@@ -303,14 +303,16 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                               {direction === 'asc' && ' \u2191'}
                               {direction === 'desc' && ' \u2193'}
                             </button>
-                            <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
-                              <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
-                                L
-                              </button>
-                              <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
-                                R
-                              </button>
-                            </div>
+                            {enableColumnPinning ? (
+                              <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
+                                <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
+                                  L
+                                </button>
+                                <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
+                                  R
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="header-filter">
                             {column.filterable ? (
@@ -364,14 +366,16 @@ export const DataGrid = ({ columns, dataSource, fetchData, loading: loadingProp 
                             {direction === 'asc' && ' \u2191'}
                             {direction === 'desc' && ' \u2193'}
                           </button>
-                          <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
-                            <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
-                              L
-                            </button>
-                            <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
-                              R
-                            </button>
-                          </div>
+                          {enableColumnPinning ? (
+                            <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
+                              <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
+                                L
+                              </button>
+                              <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
+                                R
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                       <ColumnResizeHandle column={column} enabled={enableColumnResize && isColumnResizable(column)} onResizeStart={startResize} onAutoFit={autoFitColumn} />

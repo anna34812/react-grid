@@ -30,7 +30,7 @@ export const TreeDataGrid = (props) => {
   const { columns, dataSource, treeData: treeDataConfig, rowSelection: rowSelectionProp, onSelectionChange, animateRows = true, enableColumnResize = true, columnSizeMode = COLUMN_SIZE_MODE.FIT_DATA } = props;
   const { columnOrder: columnOrderProp, onColumnOrderChange, enableColumnReorder = false } = props;
   const { onEditedRowsChange = () => {} } = props;
-  const { enableFiltering = true, LoadingComponent, EmptyComponent } = props;
+  const { enableFiltering = true, enableColumnPinning = false, LoadingComponent, EmptyComponent } = props;
 
   const SIDE_X_OVERFLOW_THRESHOLD_PX = 6;
   const gridQueryInitial = useMemo(() => ({ treeMode: true }), []);
@@ -563,14 +563,16 @@ export const TreeDataGrid = (props) => {
                               {direction === 'asc' && ' \u2191'}
                               {direction === 'desc' && ' \u2193'}
                             </button>
-                            <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
-                              <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
-                                L
-                              </button>
-                              <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
-                                R
-                              </button>
-                            </div>
+                            {enableColumnPinning ? (
+                              <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
+                                <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
+                                  L
+                                </button>
+                                <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
+                                  R
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="header-filter">
                             {column.filterable ? (
@@ -630,14 +632,16 @@ export const TreeDataGrid = (props) => {
                             {direction === 'asc' && ' \u2191'}
                             {direction === 'desc' && ' \u2193'}
                           </button>
-                          <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
-                            <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
-                              L
-                            </button>
-                            <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
-                              R
-                            </button>
-                          </div>
+                          {enableColumnPinning ? (
+                            <div className="pin-actions" role="group" aria-label={`${column.label} pinning`}>
+                              <button type="button" className={`pin-button${pin === 'left' ? ' active' : ''}`} aria-pressed={pin === 'left'} aria-label={`Pin ${column.label} left`} onClick={() => setPinForField(column.field, pin === 'left' ? null : 'left')}>
+                                L
+                              </button>
+                              <button type="button" className={`pin-button${pin === 'right' ? ' active' : ''}`} aria-pressed={pin === 'right'} aria-label={`Pin ${column.label} right`} onClick={() => setPinForField(column.field, pin === 'right' ? null : 'right')}>
+                                R
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                       <ColumnResizeHandle column={column} enabled={enableColumnResize && isColumnResizable(column)} onResizeStart={startResize} onAutoFit={autoFitColumn} />

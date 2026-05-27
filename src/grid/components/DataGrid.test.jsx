@@ -316,8 +316,15 @@ describe('DataGrid', () => {
     expect(draggableHeaders.length).toBe(1);
   });
 
+  it('hides pin controls when enableColumnPinning is false', async () => {
+    render(<DataGrid columns={columns} />);
+    await screen.findByText('User 1');
+
+    expect(screen.queryByRole('button', { name: 'Pin ID left' })).not.toBeInTheDocument();
+  });
+
   it('pins a column to the right from the header control', async () => {
-    const { container } = render(<DataGrid columns={columns} />);
+    const { container } = render(<DataGrid columns={columns} enableColumnPinning />);
     await screen.findByText('User 1');
 
     await userEvent.click(screen.getByRole('button', { name: 'Pin ID right' }));
