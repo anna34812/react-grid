@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,6 +20,7 @@ const shared = {
 /** @type {import('vite').UserConfig} */
 const libConfig = {
   ...shared,
+  plugins: [react(), cssInjectedByJsPlugin()],
   build: {
     lib: {
       entry: resolve(rootDir, 'src/index.js'),
@@ -35,10 +37,8 @@ const libConfig = {
           'react-dom': 'ReactDOM',
           'react/jsx-runtime': 'jsxRuntime',
         },
-        assetFileNames: 'style[extname]',
       },
     },
-    cssCodeSplit: false,
     outDir: 'dist',
     emptyOutDir: true,
   },

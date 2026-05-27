@@ -59,6 +59,27 @@ The package root exports:
 - `DEFAULT_ROW_SELECTION`
 - `COLUMN_SIZE_MODE`
 
+## Usage
+
+Import the component from the package root:
+
+```jsx
+import IXGrid from '@interx/ix_grid';
+```
+
+Use named exports when needed:
+
+```jsx
+import { DataGrid, TreeDataGrid, COLUMN_SIZE_MODE, DEFAULT_ROW_SELECTION } from '@interx/ix_grid';
+```
+
+### Style handling
+
+Styles are injected automatically when the JS bundle is loaded.
+
+- No separate CSS import is required in consumer apps.
+- Do not import `@interx/ix_grid/style.css`.
+
 ## Peer dependencies
 
 This library expects React to be provided by the consumer app.

@@ -12,8 +12,7 @@
     ".": {
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./style.css": "./dist/style.css"
+    }
   },
   "sideEffects": [
     "**/*.css"
@@ -28,7 +27,6 @@
     "preview": "vite preview",
     "test": "vitest run"
   },
-  "dependencies": {},
   "peerDependencies": {
     "react": ">=18 <20",
     "react-dom": ">=18 <20"
@@ -50,6 +48,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "vite": "^8.0.4",
+    "vite-plugin-css-injected-by-js": "^5.0.1",
     "vitest": "^4.1.4"
   }
 }
