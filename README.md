@@ -9,7 +9,7 @@ Add the dependency to your consumer project's `package.json`:
 ```json
 {
   "dependencies": {
-    "my-lib": "git+https://github.com/company/my-lib.git#v1.0.0"
+    "@interx/ix_grid": "git+https://github.com/anna34812/react-grid.git#v1.0.0"
   }
 }
 ```
@@ -25,7 +25,7 @@ Example for this repository:
 ```json
 {
   "dependencies": {
-    "react-data-grid": "git+https://github.com/<org>/<repo>.git#package"
+    "@interx/ix_grid": "git+https://github.com/anna34812/react-grid.git#package"
   }
 }
 ```
@@ -44,8 +44,8 @@ Use the `package` branch as the install target for internal consumers.
 2. Merge or commit library-ready changes into `package`.
 3. (Optional but recommended) Create a tag such as `v1.0.1` on `package`.
 4. In consumer projects, install using one of:
-   - branch: `git+https://github.com/<org>/<repo>.git#package`
-   - tag: `git+https://github.com/<org>/<repo>.git#v1.0.1`
+   - branch: `git+https://github.com/anna34812/react-grid.git#package`
+   - tag: `git+https://github.com/anna34812/react-grid.git#v1.0.1`
 
 For production-like stability, prefer tag refs over branch refs.
 

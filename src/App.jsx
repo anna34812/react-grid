@@ -26,7 +26,7 @@ function App() {
     const json = await res.json();
 
     const data = startRow === 1 ? json.products.map((m) => ({ ...m, description: 'test' })) : json.products;
-    return { rows: [], total: 0 };
+    // return { rows: [], total: 0 };
     return { rows: data, total: json.total };
   }, []);
 
@@ -173,7 +173,19 @@ function App() {
       />
 
       <h2 style={{ marginTop: '2rem' }}>Tree Data</h2>
-      <IXGrid treeData={{ config: treeDataConfig }} dataSource={treeFlatRows} columnSizeMode={columnSizeMode} paginationMode={paginationMode} columns={treeColumns} enableColumnReorder enableRowDrag rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }} onSelectionChange={onSelectionChange} onEditedRowsChange={onEditedRowsChange} enableFiltering={enableFiltering} />
+      <IXGrid
+        treeData={{ config: treeDataConfig }}
+        dataSource={treeFlatRows}
+        columnSizeMode={columnSizeMode}
+        paginationMode={paginationMode}
+        columns={treeColumns}
+        enableColumnReorder
+        enableRowDrag
+        rowSelection={{ ...DEFAULT_ROW_SELECTION, mode: 'multi', checkboxes: true, enableClickSelection: false }}
+        onSelectionChange={onSelectionChange}
+        onEditedRowsChange={onEditedRowsChange}
+        enableFiltering={enableFiltering}
+      />
     </main>
   );
 }
